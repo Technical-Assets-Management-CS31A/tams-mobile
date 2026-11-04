@@ -4,6 +4,7 @@ import 'package:tams_mobile/features/auth/domain/repositories/auth_repository_im
 
 import '../../../../core/network/dio_client.dart';
 import '../../../../core/network/token_provider.dart';
+import '../../../../core/storage/token_storage.dart';
 import '../../domain/entities/user.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../../domain/usecases/login_usecase.dart';
@@ -25,18 +26,32 @@ final loginUseCaseProvider = Provider<LoginUseCase>(
 /// null = logged out, User = logged in.
 class AuthController extends AsyncNotifier<User?> {
   @override
-  Future<User?> build() async => null; // TODO: restore saved session here
+  Future<User?> build() async {
+    // Restore saved session on app start
+    final storage = ref.read(tokenStorageProvider);
+    final token = await storage.readToken();
+    final email = await storage.readEmail();
+
+    if (token == null || email == null) return null;
+
+    ref.read(authTokenProvider.notifier).set(token);
+    return User(email: email, token: token);
+  }
 
   Future<void> login(String email, String password) async {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
       final user = await ref.read(loginUseCaseProvider)(email, password);
+      await ref
+          .read(tokenStorageProvider)
+          .save(token: user.token, email: user.email);
       ref.read(authTokenProvider.notifier).set(user.token);
       return user;
     });
   }
 
-  void logout() {
+  Future<void> logout() async {
+    await ref.read(tokenStorageProvider).clear();
     ref.read(authTokenProvider.notifier).clear();
     state = const AsyncData(null);
   }
