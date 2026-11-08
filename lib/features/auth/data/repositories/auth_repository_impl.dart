@@ -1,5 +1,5 @@
 import 'package:dio/dio.dart';
-import 'package:tams_mobile/features/auth/data/models/datasources/auth_remote_datasource.dart';
+import 'package:tams_mobile/features/auth/data/datasources/auth_remote_datasource.dart';
 
 import '../../../../core/errors/failures.dart';
 import '../../domain/entities/user.dart';

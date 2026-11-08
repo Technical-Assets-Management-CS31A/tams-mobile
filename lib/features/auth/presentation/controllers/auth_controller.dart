@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:tams_mobile/features/auth/data/models/datasources/auth_remote_datasource.dart';
-import 'package:tams_mobile/features/auth/domain/repositories/auth_repository_impl.dart';
+import 'package:tams_mobile/features/auth/data/datasources/auth_remote_datasource.dart';
+import 'package:tams_mobile/features/auth/data/repositories/auth_repository_impl.dart';
 
 import '../../../../core/network/dio_client.dart';
 import '../../../../core/network/token_provider.dart';
