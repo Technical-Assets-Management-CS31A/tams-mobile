@@ -45,7 +45,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(authControllerProvider);
-    final topInset = MediaQuery.paddingOf(context).top;
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -65,7 +64,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   children: [
                     const SizedBox(height: 72),
                     const Center(child: _Logo()),
-                    SizedBox(height: topInset + 72),
+                    const SizedBox(height: 72),
 
                     Text(
                       'Welcome back!',
@@ -154,7 +153,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color: _C.primary.withOpacity(0.28),
+                            color: _C.primary.withValues(alpha: 0.28),
                             blurRadius: 16,
                             offset: const Offset(0, 6),
                           ),
@@ -164,7 +163,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         onPressed: auth.isLoading ? null : _submit,
                         style: FilledButton.styleFrom(
                           backgroundColor: _C.primary,
-                          disabledBackgroundColor: _C.primary.withOpacity(0.7),
+                          disabledBackgroundColor: _C.primary.withValues(
+                            alpha: 0.7,
+                          ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16),
                           ),
@@ -291,7 +292,7 @@ class _Logo extends StatelessWidget {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.12),
+            color: Colors.black.withValues(alpha: 0.12),
             blurRadius: 18,
             offset: const Offset(0, 8),
           ),
@@ -301,7 +302,7 @@ class _Logo extends StatelessWidget {
         child: Image.asset(
           'images/aclc_logo.jpeg',
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) =>
+          errorBuilder: (_, _, _) =>
               const Icon(Icons.school, color: _C.primary, size: 30),
         ),
       ),
