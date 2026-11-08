@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 /// A successful `POST /auth/login-mobile` body, shaped like the backend's
 /// `ApiResponse<MobileLoginResponseDto>`.
 Map<String, Object?> loginResponse({
@@ -29,3 +31,12 @@ Map<String, Object?> errorResponse(String message) => {
   'Data': null,
   'Errors': null,
 };
+
+/// An unsigned JWT whose `exp` claim is [expiresAt].
+String fakeJwt(DateTime expiresAt) {
+  String part(Map<String, Object> json) =>
+      base64Url.encode(utf8.encode(jsonEncode(json))).replaceAll('=', '');
+  return '${part({'alg': 'HS512', 'typ': 'JWT'})}.'
+      '${part({'sub': 'user-1', 'exp': expiresAt.millisecondsSinceEpoch ~/ 1000})}'
+      '.signature';
+}
