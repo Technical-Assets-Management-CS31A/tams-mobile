@@ -1,4 +1,4 @@
 class ApiConstants {
-  static const baseUrl = 'https://jsonplaceholder.typicode.com';
-  static const loginPath = '/posts';
+  static const baseUrl = 'http://localhost:8000/api/v1';
+  static const loginPath = '/auth/login';
 }
