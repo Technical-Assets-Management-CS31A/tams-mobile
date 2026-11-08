@@ -63,28 +63,57 @@ void main() {
       });
     }
 
-    for (final status in [400, 401, 422]) {
-      test('HTTP $status shows "Incorrect email or password."', () async {
-        expect(
-          await failureMessage(FakeHttpAdapter(statusCode: status)),
-          'Incorrect email or password.',
-        );
-      });
-    }
+    test('HTTP 401 shows "Incorrect email or password."', () async {
+      expect(
+        await failureMessage(
+          FakeHttpAdapter(
+            statusCode: 401,
+            body: errorResponse('Invalid username or password.'),
+          ),
+        ),
+        'Incorrect email or password.',
+      );
+    });
+
+    test('HTTP 403 shows the backend\'s blocked-account message', () async {
+      const msg = 'Your account has been permanently blocked. Reason: test';
+      expect(
+        await failureMessage(
+          FakeHttpAdapter(statusCode: 403, body: errorResponse(msg)),
+        ),
+        msg,
+      );
+    });
+
+    test('HTTP 403 without a message still explains the block', () async {
+      expect(
+        await failureMessage(FakeHttpAdapter(statusCode: 403)),
+        'Your account is blocked. Please contact an administrator.',
+      );
+    });
+
+    test('HTTP 400 shows the backend message', () async {
+      expect(
+        await failureMessage(
+          FakeHttpAdapter(statusCode: 400, body: errorResponse('Bad input.')),
+        ),
+        'Bad input.',
+      );
+    });
 
     test('HTTP 500 is reported as a server error', () async {
       expect(
         await failureMessage(FakeHttpAdapter(statusCode: 500)),
-        'Server error (500).',
+        'Server error. Please try again later.',
       );
     });
 
-    test('no connection is reported as no internet', () async {
+    test('no connection says the server is unreachable', () async {
       expect(
         await failureMessage(
           FakeHttpAdapter(error: DioExceptionType.connectionError),
         ),
-        'No internet connection.',
+        "Can't reach the server. Check your internet connection.",
       );
     });
   });
