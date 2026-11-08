@@ -120,5 +120,6 @@ class AuthController extends AsyncNotifier<User?> {
   }
 }
 
-final authControllerProvider =
-    AsyncNotifierProvider<AuthController, User?>(AuthController.new);
+final authControllerProvider = AsyncNotifierProvider<AuthController, User?>(
+  AuthController.new,
+);
