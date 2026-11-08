@@ -34,10 +34,7 @@ void main() {
         DioExceptionType.receiveTimeout,
         DioExceptionType.transformTimeout,
       ]) {
-        expect(
-          fromType(t).message,
-          'Connection timed out. Please try again.',
-        );
+        expect(fromType(t).message, 'Connection timed out. Please try again.');
       }
     });
 
@@ -66,8 +63,10 @@ void main() {
     test('400/403/404 show the backend message (PascalCase body)', () {
       for (final status in [400, 403, 404]) {
         expect(
-          fromStatus(status, body: errorResponse('Item is already borrowed.'))
-              .message,
+          fromStatus(
+            status,
+            body: errorResponse('Item is already borrowed.'),
+          ).message,
           'Item is already borrowed.',
         );
       }
@@ -89,8 +88,10 @@ void main() {
 
     test('5xx stays generic even if the body has details', () {
       expect(
-        fromStatus(500, body: errorResponse('NullReferenceException at ...'))
-            .message,
+        fromStatus(
+          500,
+          body: errorResponse('NullReferenceException at ...'),
+        ).message,
         'Server error. Please try again later.',
       );
     });

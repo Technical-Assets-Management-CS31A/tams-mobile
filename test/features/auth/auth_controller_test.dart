@@ -151,26 +151,28 @@ void main() {
     });
   });
 
-  test('a storage failure on login shows a message and stays logged out',
-      () async {
-    final broken = _BrokenStorage()..failSave = true;
-    final c = makeContainer(
-      FakeHttpAdapter(body: loginResponse()),
-      tokenStorage: broken,
-    );
-    await c.read(authControllerProvider.future);
+  test(
+    'a storage failure on login shows a message and stays logged out',
+    () async {
+      final broken = _BrokenStorage()..failSave = true;
+      final c = makeContainer(
+        FakeHttpAdapter(body: loginResponse()),
+        tokenStorage: broken,
+      );
+      await c.read(authControllerProvider.future);
 
-    await c.read(authControllerProvider.notifier).login('a@b.com', 'pw');
+      await c.read(authControllerProvider.notifier).login('a@b.com', 'pw');
 
-    final state = c.read(authControllerProvider);
-    expect(state.hasError, isTrue);
-    expect(
-      state.error.toString(),
-      "Couldn't save your sign-in on this device. Please try again.",
-    );
-    expect(c.read(authTokenProvider), isNull);
-    expect(broken.cleared, isTrue);
-  });
+      final state = c.read(authControllerProvider);
+      expect(state.hasError, isTrue);
+      expect(
+        state.error.toString(),
+        "Couldn't save your sign-in on this device. Please try again.",
+      );
+      expect(c.read(authTokenProvider), isNull);
+      expect(broken.cleared, isTrue);
+    },
+  );
 
   test('logout signs out even if clearing storage fails', () async {
     final broken = _BrokenStorage();
@@ -218,7 +220,10 @@ void main() {
       );
       await pumpEventQueue();
 
-      expect(adapter.lastRequest!.headers['Authorization'], 'Bearer access-token');
+      expect(
+        adapter.lastRequest!.headers['Authorization'],
+        'Bearer access-token',
+      );
       expect(c.read(authControllerProvider).value, isNull);
       expect(c.read(authTokenProvider), isNull);
       expect(await storage.readToken(), isNull);
