@@ -22,6 +22,9 @@ class AuthRepositoryImpl implements AuthRepository {
         throw const Failure('Incorrect email or password.');
       }
       throw Failure.fromDio(e);
+    } on FormatException {
+      // 2xx, but not the login-mobile shape (wrong URL or backend changed).
+      throw const Failure('Unexpected response from the server.');
     }
   }
 }

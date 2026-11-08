@@ -2,21 +2,17 @@ import 'package:dio/dio.dart';
 import 'package:tams_mobile/core/constants/api_constants.dart';
 import 'package:tams_mobile/features/auth/data/models/user_model.dart';
 
-
 class AuthRemoteDataSource {
   final Dio _dio;
   const AuthRemoteDataSource(this._dio);
 
-  Future<UserModel> login(String email, String password) async {
+  /// [identifier] can be the user's email or username; the backend matches
+  /// either, case-insensitively.
+  Future<UserModel> login(String identifier, String password) async {
     final res = await _dio.post(
       ApiConstants.loginPath,
-      data: {'email': email, 'password': password},
+      data: {'identifier': identifier, 'password': password},
     );
-    // TODO: replace with your real response parsing, e.g.
-    // return UserModel.fromJson(res.data as Map<String, dynamic>);
-    return UserModel.fromJson({
-      'email': email,
-      'token': 'fake-token-${res.data['id']}',
-    });
+    return UserModel.fromLoginResponse(res.data);
   }
 }
