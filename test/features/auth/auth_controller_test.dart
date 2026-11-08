@@ -17,6 +17,8 @@ class _BrokenStorage extends TokenStorage {
   _BrokenStorage() : super(const FlutterSecureStorage());
 
   bool failReads = false;
+  bool failSave = false;
+  bool failClear = false;
   bool cleared = false;
 
   @override
@@ -26,8 +28,19 @@ class _BrokenStorage extends TokenStorage {
   }
 
   @override
+  Future<void> save({
+    required String token,
+    required String email,
+    String? refreshToken,
+  }) async {
+    if (failSave) throw PlatformException(code: 'KeyStoreException');
+    return super.save(token: token, email: email, refreshToken: refreshToken);
+  }
+
+  @override
   Future<void> clear() async {
     cleared = true;
+    if (failClear) throw PlatformException(code: 'KeyStoreException');
     return super.clear();
   }
 }
@@ -136,6 +149,44 @@ void main() {
       expect(c.read(authTokenProvider), isNull);
       expect(await storage.readToken(), isNull);
     });
+  });
+
+  test('a storage failure on login shows a message and stays logged out',
+      () async {
+    final broken = _BrokenStorage()..failSave = true;
+    final c = makeContainer(
+      FakeHttpAdapter(body: loginResponse()),
+      tokenStorage: broken,
+    );
+    await c.read(authControllerProvider.future);
+
+    await c.read(authControllerProvider.notifier).login('a@b.com', 'pw');
+
+    final state = c.read(authControllerProvider);
+    expect(state.hasError, isTrue);
+    expect(
+      state.error.toString(),
+      "Couldn't save your sign-in on this device. Please try again.",
+    );
+    expect(c.read(authTokenProvider), isNull);
+    expect(broken.cleared, isTrue);
+  });
+
+  test('logout signs out even if clearing storage fails', () async {
+    final broken = _BrokenStorage();
+    final c = makeContainer(
+      FakeHttpAdapter(body: loginResponse()),
+      tokenStorage: broken,
+    );
+    await c.read(authControllerProvider.future);
+    await c.read(authControllerProvider.notifier).login('a@b.com', 'pw');
+
+    broken.failClear = true;
+    await c.read(authControllerProvider.notifier).logout();
+
+    expect(c.read(authControllerProvider).value, isNull);
+    expect(c.read(authControllerProvider).hasError, isFalse);
+    expect(c.read(authTokenProvider), isNull);
   });
 
   test('logout clears the session', () async {

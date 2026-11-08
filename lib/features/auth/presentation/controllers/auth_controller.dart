@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:tams_mobile/features/auth/data/datasources/auth_remote_datasource.dart';
 import 'package:tams_mobile/features/auth/data/repositories/auth_repository_impl.dart';
 
+import '../../../../core/errors/failures.dart';
 import '../../../../core/network/dio_client.dart';
 import '../../../../core/network/token_provider.dart';
 import '../../../../core/storage/token_storage.dart';
@@ -75,22 +76,33 @@ class AuthController extends AsyncNotifier<User?> {
     state = const AsyncLoading();
     state = await AsyncValue.guard(() async {
       final user = await ref.read(loginUseCaseProvider)(email, password);
-      await ref
-          .read(tokenStorageProvider)
-          .save(
-            token: user.token,
-            email: user.email,
-            refreshToken: user.refreshToken,
-          );
+      try {
+        await ref
+            .read(tokenStorageProvider)
+            .save(
+              token: user.token,
+              email: user.email,
+              refreshToken: user.refreshToken,
+            );
+      } catch (e) {
+        // e.g. no keyring on Linux, keystore error on Android. Remove any
+        // half-written entries and stay logged out.
+        debugPrint('Could not save the session: $e');
+        await _clearStorage();
+        throw const Failure(
+          "Couldn't save your sign-in on this device. Please try again.",
+        );
+      }
       ref.read(authTokenProvider.notifier).set(user.token);
       return user;
     });
   }
 
+  /// Signs out right away; clearing storage can't keep the user signed in.
   Future<void> logout() async {
-    await ref.read(tokenStorageProvider).clear();
-    ref.read(authTokenProvider.notifier).clear();
     state = const AsyncData(null);
+    ref.read(authTokenProvider.notifier).clear();
+    await _clearStorage();
   }
 
   Future<void> _endSession() async {
