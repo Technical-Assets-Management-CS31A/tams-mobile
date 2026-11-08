@@ -10,7 +10,7 @@ class App extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
     return MaterialApp.router(
-      title: 'My App',
+      title: 'TAMS',
       theme: AppTheme.light,
       debugShowCheckedModeBanner: false,
       routerConfig: router,
