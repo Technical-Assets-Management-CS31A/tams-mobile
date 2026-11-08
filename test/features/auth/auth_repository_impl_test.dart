@@ -1,8 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tams_mobile/core/errors/failures.dart';
-import 'package:tams_mobile/features/auth/data/models/datasources/auth_remote_datasource.dart';
-import 'package:tams_mobile/features/auth/domain/repositories/auth_repository_impl.dart';
+import 'package:tams_mobile/features/auth/data/datasources/auth_remote_datasource.dart';
+import 'package:tams_mobile/features/auth/data/repositories/auth_repository_impl.dart';
 
 import '../../helpers/fake_http_adapter.dart';
 
