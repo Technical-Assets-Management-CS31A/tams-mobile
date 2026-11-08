@@ -18,14 +18,8 @@ class RedactingLogInterceptor extends Interceptor {
         k == 'set-cookie';
   }
 
-  static Object? _redact(Object? data) {
-    if (data is Map) {
-      return {
-        for (final e in data.entries)
-          e.key: _isSensitive('${e.key}') ? _mask : _redact(e.value),
-      };
-    }
-    if (data is List) return data.map(_redact).toList();
+  /// Redacts a whole request/response body.
+  static Object? _redactBody(Object? data) {
     if (data is FormData) {
       return {
         for (final f in data.fields)
@@ -34,13 +28,25 @@ class RedactingLogInterceptor extends Interceptor {
       };
     }
     if (data is String) {
-      // Raw string bodies may be JSON; never print unparseable text as-is.
+      // A raw string body may be JSON; never print unparseable text as-is.
       try {
         return _redact(jsonDecode(data));
       } catch (_) {
         return '<non-JSON body, ${data.length} chars>';
       }
     }
+    return _redact(data);
+  }
+
+  /// Redacts sensitive keys inside decoded JSON (maps/lists, any depth).
+  static Object? _redact(Object? data) {
+    if (data is Map) {
+      return {
+        for (final e in data.entries)
+          e.key: _isSensitive('${e.key}') ? _mask : _redact(e.value),
+      };
+    }
+    if (data is List) return data.map(_redact).toList();
     return data;
   }
 
@@ -53,7 +59,7 @@ class RedactingLogInterceptor extends Interceptor {
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     debugPrint('--> ${options.method} ${options.uri}');
     debugPrint('    headers: ${_headers(options.headers)}');
-    if (options.data != null) debugPrint('    body: ${_redact(options.data)}');
+    if (options.data != null) debugPrint('    body: ${_redactBody(options.data)}');
     handler.next(options);
   }
 
@@ -61,7 +67,7 @@ class RedactingLogInterceptor extends Interceptor {
   void onResponse(Response response, ResponseInterceptorHandler handler) {
     debugPrint('<-- ${response.statusCode} ${response.requestOptions.uri}');
     if (response.data != null) {
-      debugPrint('    body: ${_redact(response.data)}');
+      debugPrint('    body: ${_redactBody(response.data)}');
     }
     handler.next(response);
   }
@@ -73,7 +79,7 @@ class RedactingLogInterceptor extends Interceptor {
       '${err.requestOptions.uri}',
     );
     if (err.response?.data != null) {
-      debugPrint('    body: ${_redact(err.response!.data)}');
+      debugPrint('    body: ${_redactBody(err.response!.data)}');
     }
     handler.next(err);
   }
