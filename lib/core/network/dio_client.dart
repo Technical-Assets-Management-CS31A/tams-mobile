@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../constants/api_constants.dart';
+import 'redacting_log_interceptor.dart';
 import 'token_provider.dart';
 
 final dioProvider = Provider<Dio>((ref) {
@@ -28,7 +29,8 @@ final dioProvider = Provider<Dio>((ref) {
   );
 
   if (kDebugMode) {
-    dio.interceptors.add(LogInterceptor(requestBody: true, responseBody: true));
+    // Masks passwords/tokens/auth headers — never log secrets.
+    dio.interceptors.add(RedactingLogInterceptor());
   }
 
   return dio;
