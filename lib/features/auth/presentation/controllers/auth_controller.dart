@@ -35,7 +35,11 @@ class AuthController extends AsyncNotifier<User?> {
     if (token == null || email == null) return null;
 
     ref.read(authTokenProvider.notifier).set(token);
-    return User(email: email, token: token);
+    return User(
+      email: email,
+      token: token,
+      refreshToken: await storage.readRefreshToken(),
+    );
   }
 
   Future<void> login(String email, String password) async {
@@ -44,7 +48,11 @@ class AuthController extends AsyncNotifier<User?> {
       final user = await ref.read(loginUseCaseProvider)(email, password);
       await ref
           .read(tokenStorageProvider)
-          .save(token: user.token, email: user.email);
+          .save(
+            token: user.token,
+            email: user.email,
+            refreshToken: user.refreshToken,
+          );
       ref.read(authTokenProvider.notifier).set(user.token);
       return user;
     });

@@ -5,6 +5,7 @@ import 'package:tams_mobile/features/auth/data/datasources/auth_remote_datasourc
 import 'package:tams_mobile/features/auth/data/repositories/auth_repository_impl.dart';
 
 import '../../helpers/fake_http_adapter.dart';
+import '../../helpers/login_fixtures.dart';
 
 void main() {
   AuthRepositoryImpl repoWith(FakeHttpAdapter adapter) =>
@@ -20,14 +21,47 @@ void main() {
   }
 
   group('AuthRepositoryImpl.login', () {
-    test('returns the user on success', () async {
-      final adapter = FakeHttpAdapter(body: {'id': 7});
+    test('parses the user and tokens from the response', () async {
+      final adapter = FakeHttpAdapter(
+        body: loginResponse(accessToken: 'jwt-1', refreshToken: 'rt-1'),
+      );
       final user = await repoWith(adapter).login('a@b.com', 'pw');
 
       expect(user.email, 'a@b.com');
-      expect(user.token, 'fake-token-7');
-      expect(adapter.lastRequest!.data, {'email': 'a@b.com', 'password': 'pw'});
+      expect(user.token, 'jwt-1');
+      expect(user.refreshToken, 'rt-1');
+      expect(adapter.lastRequest!.path, '/auth/login-mobile');
+      expect(adapter.lastRequest!.data, {
+        'identifier': 'a@b.com',
+        'password': 'pw',
+      });
     });
+
+    test('falls back to the username when the email is empty', () async {
+      final adapter = FakeHttpAdapter(
+        body: loginResponse(email: '', username: 'juan'),
+      );
+      final user = await repoWith(adapter).login('juan', 'pw');
+
+      expect(user.email, 'juan');
+    });
+
+    for (final body in <Object>[
+      {},
+      {'success': true, 'data': null},
+      {
+        'success': true,
+        'data': {'user': {}},
+      },
+      ['not', 'a', 'map'],
+    ]) {
+      test('unexpected body $body is a readable failure', () async {
+        expect(
+          await failureMessage(FakeHttpAdapter(body: body)),
+          'Unexpected response from the server.',
+        );
+      });
+    }
 
     for (final status in [400, 401, 422]) {
       test('HTTP $status shows "Incorrect email or password."', () async {

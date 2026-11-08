@@ -7,6 +7,7 @@ import 'package:tams_mobile/core/storage/token_storage.dart';
 import 'package:tams_mobile/features/auth/presentation/controllers/auth_controller.dart';
 
 import '../../helpers/fake_http_adapter.dart';
+import '../../helpers/login_fixtures.dart';
 
 void main() {
   const storage = TokenStorage(FlutterSecureStorage());
@@ -46,14 +47,15 @@ void main() {
   });
 
   test('successful login saves the token and logs in', () async {
-    final c = makeContainer(FakeHttpAdapter(body: {'id': 3}));
+    final c = makeContainer(FakeHttpAdapter(body: loginResponse(accessToken: 'jwt-3')));
     await c.read(authControllerProvider.future);
 
     await c.read(authControllerProvider.notifier).login('a@b.com', 'pw');
 
     expect(c.read(authControllerProvider).value?.email, 'a@b.com');
-    expect(c.read(authTokenProvider), 'fake-token-3');
-    expect(await storage.readToken(), 'fake-token-3');
+    expect(c.read(authTokenProvider), 'jwt-3');
+    expect(await storage.readToken(), 'jwt-3');
+    expect(await storage.readRefreshToken(), 'refresh-token');
   });
 
   test('invalid credentials set an error and stay logged out', () async {
@@ -70,7 +72,7 @@ void main() {
   });
 
   test('logout clears the session', () async {
-    final c = makeContainer(FakeHttpAdapter(body: {'id': 3}));
+    final c = makeContainer(FakeHttpAdapter(body: loginResponse(accessToken: 'jwt-3')));
     await c.read(authControllerProvider.future);
     await c.read(authControllerProvider.notifier).login('a@b.com', 'pw');
 
@@ -79,5 +81,6 @@ void main() {
     expect(c.read(authControllerProvider).value, isNull);
     expect(c.read(authTokenProvider), isNull);
     expect(await storage.readToken(), isNull);
+    expect(await storage.readRefreshToken(), isNull);
   });
 }
