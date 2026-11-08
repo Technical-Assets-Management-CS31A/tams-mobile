@@ -5,12 +5,13 @@ import 'package:dio/dio.dart';
 
 /// Replaces Dio's network layer so tests never hit a real server.
 /// Returns [statusCode]/[body], or throws [error] if one is given.
+/// Fields are mutable so a test can change the next response.
 class FakeHttpAdapter implements HttpClientAdapter {
   FakeHttpAdapter({this.statusCode = 200, this.body = const {}, this.error});
 
-  final int statusCode;
-  final Object body;
-  final DioExceptionType? error;
+  int statusCode;
+  Object body;
+  DioExceptionType? error;
 
   /// Last request seen, so tests can inspect what was sent.
   RequestOptions? lastRequest;

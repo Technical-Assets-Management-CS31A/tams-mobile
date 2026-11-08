@@ -25,6 +25,18 @@ final dioProvider = Provider<Dio>((ref) {
         }
         handler.next(options);
       },
+      onError: (err, handler) {
+        // The server rejected our token (expired or revoked). Clearing it
+        // signs the user out; AuthController listens for this.
+        final sentAuth = err.requestOptions.headers['Authorization'];
+        final current = ref.read(authTokenProvider);
+        if (err.response?.statusCode == 401 &&
+            current != null &&
+            sentAuth == 'Bearer $current') {
+          ref.read(authTokenProvider.notifier).clear();
+        }
+        handler.next(err);
+      },
     ),
   );
 
