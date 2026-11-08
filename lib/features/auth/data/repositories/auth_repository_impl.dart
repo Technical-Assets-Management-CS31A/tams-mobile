@@ -14,12 +14,19 @@ class AuthRepositoryImpl implements AuthRepository {
     try {
       return await _remote.login(email, password);
     } on DioException catch (e) {
-      // Backend rejects bad credentials with a 4xx (usually 401; some
-      // frameworks use 400/422). Show a friendly message instead of a code.
-      final status = e.response?.statusCode;
-      if (e.type == DioExceptionType.badResponse &&
-          (status == 400 || status == 401 || status == 422)) {
-        throw const Failure('Incorrect email or password.');
+      if (e.type == DioExceptionType.badResponse) {
+        switch (e.response?.statusCode) {
+          // Wrong password or unknown user (InvalidCredentialsException).
+          case 401:
+            throw const Failure('Incorrect email or password.');
+          // Blocked account (UserBlockedException). The backend's message
+          // says until when and why, so show it.
+          case 403:
+            throw Failure(
+              Failure.serverMessage(e) ??
+                  'Your account is blocked. Please contact an administrator.',
+            );
+        }
       }
       throw Failure.fromDio(e);
     } on FormatException {

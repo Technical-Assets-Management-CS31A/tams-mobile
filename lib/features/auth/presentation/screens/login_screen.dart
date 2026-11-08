@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
+import '../../../../core/errors/failures.dart';
 import '../controllers/auth_controller.dart';
 
 class _C {
@@ -134,7 +135,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       Padding(
                         padding: const EdgeInsets.only(bottom: 12),
                         child: Text(
-                          '${auth.error}',
+                          // Only Failure messages are written for users.
+                          auth.error is Failure
+                              ? (auth.error as Failure).message
+                              : 'Something went wrong. Please try again.',
                           style: GoogleFonts.poppins(
                             fontSize: 13,
                             color: Theme.of(context).colorScheme.error,
