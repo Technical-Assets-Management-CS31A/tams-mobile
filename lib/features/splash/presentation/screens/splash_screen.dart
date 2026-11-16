@@ -10,7 +10,7 @@ class _C {
 }
 
 /// Shown at launch while the saved session is checked. The router moves on
-/// to /login or /home by itself once the app is ready.
+/// to /login or the tabs by itself once the app is ready.
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
