@@ -2,7 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:tams_mobile/features/approvals/domain/entities/pending_approval.dart';
+import 'package:tams_mobile/features/approvals/presentation/controllers/approvals_controller.dart';
 import 'package:tams_mobile/routing/app_router.dart';
+
+/// No pending requests, so every tab shows its empty state.
+class _NoApprovals extends ApprovalsController {
+  @override
+  List<PendingApproval> build() => const [];
+}
 
 Future<GoRouter> _pumpShell(WidgetTester tester) async {
   final router = GoRouter(
@@ -11,7 +19,10 @@ Future<GoRouter> _pumpShell(WidgetTester tester) async {
   );
   addTearDown(router.dispose);
   await tester.pumpWidget(
-    ProviderScope(child: MaterialApp.router(routerConfig: router)),
+    ProviderScope(
+      overrides: [approvalsControllerProvider.overrideWith(_NoApprovals.new)],
+      child: MaterialApp.router(routerConfig: router),
+    ),
   );
   await tester.pumpAndSettle();
   return router;
