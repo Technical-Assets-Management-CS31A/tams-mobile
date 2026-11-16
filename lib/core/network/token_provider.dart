@@ -9,5 +9,6 @@ class TokenNotifier extends Notifier<String?> {
   void clear() => state = null;
 }
 
-final authTokenProvider =
-    NotifierProvider<TokenNotifier, String?>(TokenNotifier.new);
+final authTokenProvider = NotifierProvider<TokenNotifier, String?>(
+  TokenNotifier.new,
+);

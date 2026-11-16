@@ -1,0 +1,17 @@
+# Used by the "Secret scan" job in .github/workflows/ci.yml.
+title = "tams-mobile gitleaks config"
+
+[extend]
+useDefault = true
+
+# Firebase client config. The API keys in these files ship inside every app
+# build and only identify the Firebase project; access is controlled by
+# Firebase security rules, so they are not secrets.
+[[allowlists]]
+description = "Firebase client config files"
+paths = [
+  '''lib/firebase_options\.dart$''',
+  '''android/app/google-services\.json$''',
+  '''ios/Runner/GoogleService-Info\.plist$''',
+  '''macos/Runner/GoogleService-Info\.plist$''',
+]

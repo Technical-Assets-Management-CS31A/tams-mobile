@@ -59,7 +59,9 @@ class RedactingLogInterceptor extends Interceptor {
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     debugPrint('--> ${options.method} ${options.uri}');
     debugPrint('    headers: ${_headers(options.headers)}');
-    if (options.data != null) debugPrint('    body: ${_redactBody(options.data)}');
+    if (options.data != null) {
+      debugPrint('    body: ${_redactBody(options.data)}');
+    }
     handler.next(options);
   }
 
