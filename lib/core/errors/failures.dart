@@ -48,14 +48,23 @@ class Failure implements Exception {
     return Failure('Request failed ($status).');
   }
 
-  /// The `message` field of the backend's ApiResponse error body, if any.
+  /// The human-readable message of an error body, if any: `detail` of an
+  /// RFC 7807 problem (PRD 6.3), or `message` of the older ApiResponse body.
   /// The backend's error handler writes PascalCase (`Message`), while normal
   /// responses are camelCase, so check both.
   static String? serverMessage(DioException e) {
     final data = e.response?.data;
     if (data is! Map) return null;
-    final message = data['message'] ?? data['Message'];
+    final message = data['detail'] ?? data['message'] ?? data['Message'];
     return message is String && message.trim().isNotEmpty ? message : null;
+  }
+
+  /// The stable machine-readable `code` of a problem body (for example
+  /// `APPROVAL_EXPIRED`), if any.
+  static String? errorCode(DioException e) {
+    final data = e.response?.data;
+    final code = data is Map ? data['code'] : null;
+    return code is String && code.isNotEmpty ? code : null;
   }
 
   @override
