@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/errors/failures.dart';
 import '../../../../core/network/token_provider.dart';
+import '../../../../core/utils/clock.dart';
 import '../../../../core/widgets/empty_state.dart';
 import '../../domain/entities/pending_approval.dart';
 import '../controllers/approvals_controller.dart';
@@ -21,18 +22,20 @@ class ApprovalsScreen extends ConsumerStatefulWidget {
 }
 
 class _ApprovalsScreenState extends ConsumerState<ApprovalsScreen> {
-  /// Ticks the countdowns; requests drop off once they expire.
+  /// Ticks the countdowns; cards switch to expired when theirs runs out.
   Timer? _ticker;
-  DateTime _now = DateTime.now();
+  late DateTime _now = _clock();
 
   /// Requests with a decision on its way to the server.
   final _busy = <String>{};
+
+  Clock get _clock => ref.read(clockProvider);
 
   @override
   void initState() {
     super.initState();
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() => _now = DateTime.now());
+      if (mounted) setState(() => _now = _clock());
     });
   }
 
@@ -77,10 +80,7 @@ class _ApprovalsScreenState extends ConsumerState<ApprovalsScreen> {
   }
 
   Widget _list(PendingApprovals data, Map<String, String>? photoHeaders) {
-    final requests = [
-      for (final r in data.items)
-        if (!r.isExpired(_now)) r,
-    ];
+    final requests = data.items;
 
     if (requests.isEmpty && !data.frozen) {
       return _Scrollable(
@@ -107,6 +107,7 @@ class _ApprovalsScreenState extends ConsumerState<ApprovalsScreen> {
             canApprove: !data.frozen,
             onApprove: () => _approve(request, photoHeaders),
             onDecline: () => _decline(request),
+            onDismiss: () => _controller.dismiss(request.id),
           ),
           const SizedBox(height: 12),
         ],
@@ -121,9 +122,10 @@ class _ApprovalsScreenState extends ConsumerState<ApprovalsScreen> {
     final decision = await showApproveSheet(
       context,
       request: request,
+      clock: _clock,
       photoHeaders: photoHeaders,
     );
-    if (decision == null || !mounted) return;
+    if (decision == null || !mounted || _expiredMeanwhile(request)) return;
 
     final ok = await _send(
       request,
@@ -160,10 +162,20 @@ class _ApprovalsScreenState extends ConsumerState<ApprovalsScreen> {
         ],
       ),
     );
-    if (confirmed != true || !mounted) return;
+    if (confirmed != true || !mounted || _expiredMeanwhile(request)) return;
 
     final ok = await _send(request, () => _controller.decline(request.id));
     if (ok) _snack('Declined request from ${request.studentName}');
+  }
+
+  /// True, with a message, if [request] ran out of time while the
+  /// instructor was deciding. Nothing is sent: the kiosk already denied it.
+  bool _expiredMeanwhile(PendingApproval request) {
+    final now = _clock();
+    if (!request.isExpired(now)) return false;
+    setState(() => _now = now);
+    _snack('This request timed out and the borrow was denied.');
+    return true;
   }
 
   /// Runs [call] with the card busy; shows the error and returns false if
