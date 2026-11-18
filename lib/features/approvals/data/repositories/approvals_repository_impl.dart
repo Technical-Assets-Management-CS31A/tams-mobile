@@ -40,7 +40,7 @@ class ApprovalsRepositoryImpl implements ApprovalsRepository {
   static Failure _decisionFailure(DioException e) {
     final code = Failure.errorCode(e);
     switch (code) {
-      case 'APPROVAL_EXPIRED':
+      case ApprovalFailure.expired:
         return ApprovalFailure(
           'This request timed out and the borrow was denied.',
           code: code,
