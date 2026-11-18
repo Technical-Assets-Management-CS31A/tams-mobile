@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/dio_client.dart';
+import '../../../../core/utils/clock.dart';
 import '../../data/datasources/approvals_remote_datasource.dart';
 import '../../data/repositories/approvals_repository_impl.dart';
 import '../../domain/entities/pending_approval.dart';
@@ -8,12 +9,18 @@ import '../../domain/repositories/approvals_repository.dart';
 
 final approvalsRepositoryProvider = Provider<ApprovalsRepository>(
   (ref) => ApprovalsRepositoryImpl(
-    ApprovalsRemoteDataSource(ref.watch(dioProvider)),
+    ApprovalsRemoteDataSource(
+      ref.watch(dioProvider),
+      now: ref.watch(clockProvider),
+    ),
   ),
 );
 
 /// Requests waiting for my decision, oldest first, from
 /// `GET /approvals/pending`.
+///
+/// Requests whose 120 s run out stay in the list, shown as expired, until
+/// they are dismissed or the list is reloaded (the server drops them).
 class ApprovalsController extends AsyncNotifier<PendingApprovals> {
   ApprovalsRepository get _repo => ref.read(approvalsRepositoryProvider);
 
@@ -37,19 +44,28 @@ class ApprovalsController extends AsyncNotifier<PendingApprovals> {
   /// Declines [id]; the kiosk denies the borrow. Throws like [approve].
   Future<void> decline(String id) => _decide(id, () => _repo.decline(id));
 
+  /// Takes an expired request off the list.
+  void dismiss(String id) => _update((list) => list.without(id));
+
   Future<void> _decide(String id, Future<void> Function() call) async {
     try {
       await call();
     } on ApprovalFailure catch (f) {
-      if (f.requestGone) _remove(id);
+      if (f.code == ApprovalFailure.expired) {
+        // Keep it on screen as expired so the instructor sees why.
+        final now = ref.read(clockProvider)();
+        _update((list) => list.updating(id, (r) => r.expiredAt(now)));
+      } else if (f.requestGone) {
+        _update((list) => list.without(id));
+      }
       rethrow;
     }
-    _remove(id);
+    _update((list) => list.without(id));
   }
 
-  void _remove(String id) {
+  void _update(PendingApprovals Function(PendingApprovals) change) {
     final current = state.value;
-    if (current != null) state = AsyncData(current.without(id));
+    if (current != null) state = AsyncData(change(current));
   }
 }
 
