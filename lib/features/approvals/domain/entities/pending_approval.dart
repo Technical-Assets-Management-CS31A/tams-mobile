@@ -84,6 +84,49 @@ class PendingApproval {
   }
 
   bool isExpired(DateTime now) => !now.isBefore(expiresAt);
+
+  /// Time until [expiresAt]; zero once expired.
+  Duration timeLeft(DateTime now) {
+    final left = expiresAt.difference(now);
+    return left.isNegative ? Duration.zero : left;
+  }
+
+  /// How much of the approval window is left, from 1 (just requested) to
+  /// 0 (expired).
+  double fractionLeft(DateTime now) {
+    final window = expiresAt.difference(requestedAt);
+    if (window <= Duration.zero) return isExpired(now) ? 0 : 1;
+    return (timeLeft(now).inMilliseconds / window.inMilliseconds).clamp(0, 1);
+  }
+
+  /// This request with its timestamps moved by [offset], to put server
+  /// times on the device's clock.
+  PendingApproval shifted(Duration offset) => offset == Duration.zero
+      ? this
+      : _copy(
+          requestedAt: requestedAt.add(offset),
+          expiresAt: expiresAt.add(offset),
+        );
+
+  /// This request, expired as of [at] (the server said it timed out).
+  PendingApproval expiredAt(DateTime at) =>
+      isExpired(at) ? this : _copy(expiresAt: at);
+
+  PendingApproval _copy({DateTime? requestedAt, DateTime? expiresAt}) =>
+      PendingApproval(
+        id: id,
+        studentName: studentName,
+        studentNumber: studentNumber,
+        sectionCode: sectionCode,
+        photoUrl: photoUrl,
+        items: items,
+        requestedAt: requestedAt ?? this.requestedAt,
+        expiresAt: expiresAt ?? this.expiresAt,
+        roomOptions: roomOptions,
+        defaultRoomId: defaultRoomId,
+        classLengthOptions: classLengthOptions,
+        defaultClassLength: defaultClassLength,
+      );
 }
 
 /// What `GET /approvals/pending` returns: the requests, and whether the
@@ -103,6 +146,24 @@ class PendingApprovals {
         if (r.id != id) r,
     ],
   );
+
+  /// With request [id] replaced by `update(request)`.
+  PendingApprovals updating(
+    String id,
+    PendingApproval Function(PendingApproval) update,
+  ) => PendingApprovals(
+    frozen: frozen,
+    items: [for (final r in items) r.id == id ? update(r) : r],
+  );
+
+  /// Every request's timestamps moved by [offset]; see
+  /// [PendingApproval.shifted].
+  PendingApprovals shifted(Duration offset) => offset == Duration.zero
+      ? this
+      : PendingApprovals(
+          frozen: frozen,
+          items: [for (final r in items) r.shifted(offset)],
+        );
 }
 
 /// What the instructor chose when approving a request.
