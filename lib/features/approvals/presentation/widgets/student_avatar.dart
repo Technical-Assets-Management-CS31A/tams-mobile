@@ -7,11 +7,16 @@ class StudentAvatar extends StatelessWidget {
     super.key,
     required this.name,
     this.photoUrl,
+    this.headers,
     this.radius = 24,
   });
 
   final String name;
   final String? photoUrl;
+
+  /// Sent with the photo request, e.g. the `Authorization` header the
+  /// checkout photo endpoint needs.
+  final Map<String, String>? headers;
   final double radius;
 
   @override
@@ -27,7 +32,9 @@ class StudentAvatar extends StatelessWidget {
         backgroundColor: colors.secondaryContainer,
         foregroundColor: colors.onSecondaryContainer,
         // Initials stay underneath, so they show while loading or on error.
-        foregroundImage: url == null ? null : NetworkImage(url),
+        foregroundImage: url == null
+            ? null
+            : NetworkImage(url, headers: headers),
         onForegroundImageError: url == null ? null : (_, _) {},
         child: Text(
           initials(name),
