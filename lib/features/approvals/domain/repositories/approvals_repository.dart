@@ -16,6 +16,9 @@ abstract interface class ApprovalsRepository {
 class ApprovalFailure extends Failure {
   const ApprovalFailure(super.message, {this.code, this.requestGone = false});
 
+  /// [code] when the request's 120 s ran out before the decision arrived.
+  static const expired = 'APPROVAL_EXPIRED';
+
   final String? code;
   final bool requestGone;
 }
