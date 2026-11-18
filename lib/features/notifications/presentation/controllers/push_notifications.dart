@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../routing/app_router.dart';
 import '../../../../routing/pending_location.dart';
+import '../../../approvals/presentation/controllers/approvals_controller.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../../splash/presentation/controllers/app_ready_provider.dart';
 import '../../data/push_messaging.dart';
@@ -72,11 +73,20 @@ class PushNotifications {
   }
 
   void _opened(RemoteMessage message) {
+    _refreshData(message);
     final location = locationForPush(message.data);
     if (location != null) open(location);
   }
 
+  /// A new request means the cached Pending Approvals list is stale.
+  void _refreshData(RemoteMessage message) {
+    if (message.data['type'] == 'approval.requested') {
+      _ref.invalidate(approvalsControllerProvider);
+    }
+  }
+
   void _showInApp(RemoteMessage message) {
+    _refreshData(message);
     final messenger = _ref.read(scaffoldMessengerKeyProvider).currentState;
     final title = message.notification?.title;
     final body = message.notification?.body;
