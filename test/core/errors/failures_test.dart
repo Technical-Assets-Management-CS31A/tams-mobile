@@ -79,6 +79,34 @@ void main() {
       );
     });
 
+    test('RFC 7807 problem detail is read', () {
+      expect(
+        fromStatus(
+          404,
+          body: {'code': 'APPROVAL_NOT_FOUND', 'detail': 'Request not found.'},
+        ).message,
+        'Request not found.',
+      );
+    });
+
+    test('errorCode reads the problem code', () {
+      DioException withBody(Object? body) => DioException(
+        requestOptions: options,
+        type: DioExceptionType.badResponse,
+        response: Response(
+          requestOptions: options,
+          statusCode: 409,
+          data: body,
+        ),
+      );
+      expect(
+        Failure.errorCode(withBody({'code': 'APPROVAL_EXPIRED'})),
+        'APPROVAL_EXPIRED',
+      );
+      expect(Failure.errorCode(withBody({'detail': 'x'})), isNull);
+      expect(Failure.errorCode(withBody('html')), isNull);
+    });
+
     test('400/403/404 without a message use a default', () {
       expect(fromStatus(400).message, 'The request was invalid.');
       expect(fromStatus(403).message, "You don't have permission to do that.");

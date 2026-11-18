@@ -15,6 +15,8 @@ import 'package:tams_mobile/features/splash/presentation/controllers/app_ready_p
 import 'package:tams_mobile/routing/app_router.dart';
 import 'package:tams_mobile/routing/pending_location.dart';
 
+import '../../helpers/fake_approvals_repository.dart';
+
 class _FakeMessaging implements PushMessaging {
   final foreground = StreamController<RemoteMessage>.broadcast();
   final opened = StreamController<RemoteMessage>.broadcast();
@@ -58,11 +60,6 @@ class _SignedOut extends AuthController {
   Future<User?> build() async => null;
 }
 
-class _NoApprovals extends ApprovalsController {
-  @override
-  List<PendingApproval> build() => const [];
-}
-
 RemoteMessage _push(String type, {String? title = 'Title', String? body}) =>
     RemoteMessage(
       data: {'type': type},
@@ -72,11 +69,12 @@ RemoteMessage _push(String type, {String? title = 'Title', String? body}) =>
     );
 
 class _Harness {
-  _Harness(this.container, this.router, this.messaging);
+  _Harness(this.container, this.router, this.messaging, this.approvals);
 
   final ProviderContainer container;
   final GoRouter router;
   final _FakeMessaging messaging;
+  final FakeApprovalsRepository approvals;
 
   String get location => router.routerDelegate.currentConfiguration.uri.path;
 }
@@ -89,6 +87,7 @@ Future<_Harness> _pump(
 }) async {
   final messaging = _FakeMessaging()..initial = initialMessage;
   addTearDown(messaging.close);
+  final approvals = FakeApprovalsRepository();
   final router = GoRouter(
     initialLocation: initialLocation,
     routes: [shellRoute()],
@@ -103,7 +102,7 @@ Future<_Harness> _pump(
       ),
       appReadyProvider.overrideWith((ref) async {}),
       routerProvider.overrideWithValue(router),
-      approvalsControllerProvider.overrideWith(_NoApprovals.new),
+      approvalsRepositoryProvider.overrideWithValue(approvals),
     ],
   );
   addTearDown(container.dispose);
@@ -121,7 +120,7 @@ Future<_Harness> _pump(
   );
   await container.read(pushNotificationsProvider).start();
   await tester.pumpAndSettle();
-  return _Harness(container, router, messaging);
+  return _Harness(container, router, messaging, approvals);
 }
 
 void main() {
@@ -206,6 +205,30 @@ void main() {
       await _showSnackBar(tester);
 
       expect(find.byType(SnackBar), findsNothing);
+    });
+
+    testWidgets('a new approval request reloads Pending Approvals', (
+      tester,
+    ) async {
+      final h = await _pump(tester);
+      expect(h.approvals.pendingCalls, 1);
+      h.approvals.result = PendingApprovals(items: [approval('s-1')]);
+
+      // Even data-only: the list must not stay stale.
+      h.messaging.foreground.add(_push('approval.requested', title: null));
+      await tester.pumpAndSettle();
+
+      expect(h.approvals.pendingCalls, 2);
+      expect(find.text('Maria Santos'), findsOneWidget);
+    });
+
+    testWidgets('other pushes leave the list alone', (tester) async {
+      final h = await _pump(tester);
+
+      h.messaging.foreground.add(_push('loan.overdue', title: null));
+      await tester.pumpAndSettle();
+
+      expect(h.approvals.pendingCalls, 1);
     });
   });
 

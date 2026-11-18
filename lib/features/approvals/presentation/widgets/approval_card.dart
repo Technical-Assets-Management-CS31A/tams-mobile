@@ -3,22 +3,33 @@ import 'package:flutter/material.dart';
 import '../../domain/entities/pending_approval.dart';
 import 'student_avatar.dart';
 
-/// One pending request: who is asking, for what, and Approve/Reject.
+/// One pending request: who is asking, for what, time left, and
+/// Approve/Decline.
 class ApprovalCard extends StatelessWidget {
   const ApprovalCard({
     super.key,
     required this.request,
     required this.now,
     required this.onApprove,
-    required this.onReject,
+    required this.onDecline,
+    this.photoHeaders,
+    this.busy = false,
+    this.canApprove = true,
   });
 
   final PendingApproval request;
 
-  /// Used for "4 min ago". Passed in so the whole list agrees on the time.
+  /// Used for the countdown. Passed in so the whole list agrees on the time.
   final DateTime now;
   final VoidCallback onApprove;
-  final VoidCallback onReject;
+  final VoidCallback onDecline;
+  final Map<String, String>? photoHeaders;
+
+  /// A decision is being sent; the buttons are disabled meanwhile.
+  final bool busy;
+
+  /// False while the instructor's approval rights are frozen (FR-2.3).
+  final bool canApprove;
 
   @override
   Widget build(BuildContext context) {
@@ -26,6 +37,9 @@ class ApprovalCard extends StatelessWidget {
     final muted = theme.textTheme.bodySmall?.copyWith(
       color: theme.colorScheme.onSurfaceVariant,
     );
+    final left = request.expiresAt.difference(now);
+    final urgent = left < const Duration(seconds: 30);
+    final more = request.items.length - 1;
 
     return Card.outlined(
       child: Padding(
@@ -39,6 +53,7 @@ class ApprovalCard extends StatelessWidget {
                 StudentAvatar(
                   name: request.studentName,
                   photoUrl: request.photoUrl,
+                  headers: photoHeaders,
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -49,11 +64,23 @@ class ApprovalCard extends StatelessWidget {
                         request.studentName,
                         style: theme.textTheme.titleSmall,
                       ),
-                      Text(request.studentNumber, style: muted),
+                      Text(
+                        [
+                          request.studentNumber,
+                          ?request.sectionCode,
+                        ].where((s) => s.isNotEmpty).join(' · '),
+                        style: muted,
+                      ),
                     ],
                   ),
                 ),
-                Text(timeAgo(request.requestedAt, now), style: muted),
+                Text(
+                  timeLeft(left),
+                  style: muted?.copyWith(
+                    color: urgent ? theme.colorScheme.error : null,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 12),
@@ -67,7 +94,9 @@ class ApprovalCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    request.itemName,
+                    more > 0
+                        ? '${request.itemName} + $more more'
+                        : request.itemName,
                     style: theme.textTheme.bodyMedium,
                   ),
                 ),
@@ -79,10 +108,18 @@ class ApprovalCard extends StatelessWidget {
               alignment: MainAxisAlignment.end,
               spacing: 8,
               children: [
-                TextButton(onPressed: onReject, child: const Text('Reject')),
+                TextButton(
+                  onPressed: busy ? null : onDecline,
+                  child: const Text('Decline'),
+                ),
                 FilledButton.tonal(
-                  onPressed: onApprove,
-                  child: const Text('Approve'),
+                  onPressed: busy || !canApprove ? null : onApprove,
+                  child: busy
+                      ? const SizedBox.square(
+                          dimension: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Approve'),
                 ),
               ],
             ),
@@ -93,11 +130,10 @@ class ApprovalCard extends StatelessWidget {
   }
 }
 
-/// "Just now", "4 min ago", "1 h ago", "2 d ago".
-String timeAgo(DateTime time, DateTime now) {
-  final diff = now.difference(time);
-  if (diff.inMinutes < 1) return 'Just now';
-  if (diff.inHours < 1) return '${diff.inMinutes} min ago';
-  if (diff.inDays < 1) return '${diff.inHours} h ago';
-  return '${diff.inDays} d ago';
+/// "1:42 left", "0:05 left", "Expired".
+String timeLeft(Duration left) {
+  if (left <= Duration.zero) return 'Expired';
+  final seconds = left.inSeconds;
+  final s = (seconds % 60).toString().padLeft(2, '0');
+  return '${seconds ~/ 60}:$s left';
 }

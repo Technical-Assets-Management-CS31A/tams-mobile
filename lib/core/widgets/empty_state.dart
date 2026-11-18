@@ -7,11 +7,15 @@ class EmptyState extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.message,
+    this.action,
   });
 
   final IconData icon;
   final String title;
   final String message;
+
+  /// Optional button under the message, such as "Try again".
+  final Widget? action;
 
   @override
   Widget build(BuildContext context) {
@@ -54,6 +58,10 @@ class EmptyState extends StatelessWidget {
                 ),
               ),
             ),
+            if (action case final action?) ...[
+              const SizedBox(height: 20),
+              action,
+            ],
           ],
         ),
       ),
