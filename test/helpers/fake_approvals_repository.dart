@@ -53,6 +53,10 @@ class FakeApprovalsRepository implements ApprovalsRepository {
   /// Thrown by [approve] / [decline] when set.
   Object? decisionError;
 
+  /// Runs while [approve] / [decline] wait for the "server", e.g. to let
+  /// time pass during the call.
+  void Function()? whileDeciding;
+
   int pendingCalls = 0;
   final approved = <(String, ApprovalDecision)>[];
   final declined = <String>[];
@@ -66,12 +70,14 @@ class FakeApprovalsRepository implements ApprovalsRepository {
 
   @override
   Future<void> approve(String id, ApprovalDecision decision) async {
+    whileDeciding?.call();
     if (decisionError case final e?) throw e;
     approved.add((id, decision));
   }
 
   @override
   Future<void> decline(String id) async {
+    whileDeciding?.call();
     if (decisionError case final e?) throw e;
     declined.add(id);
   }
