@@ -12,27 +12,41 @@ class ApprovalsRemoteDataSource {
   final Dio _dio;
   final Clock _now;
 
-  /// Smaller differences between the server's and the phone's clock are
-  /// ignored: the `Date` header only has whole seconds, plus network delay.
+  /// A phone clock found to be ahead by less than this is treated as
+  /// right. That only makes the countdown end a little early, never late,
+  /// and keeps it from jumping around between reloads.
   static const clockSkewTolerance = Duration(seconds: 3);
 
   /// Pending requests with their times on the phone's clock, so the
   /// 120 s countdown is right even when the phone's clock is off.
+  ///
+  /// The server's time comes from the `Date` response header. On the web
+  /// the browser only lets the app read it if the API sends
+  /// `Access-Control-Expose-Headers: Date` (or is on the same origin);
+  /// without it the phone's clock is used as is.
   Future<PendingApprovals> pending() async {
+    final sentAt = _now();
     final res = await _dio.get<Object?>('/approvals/pending');
     final approvals = parsePendingApprovals(
       res.data,
       baseUrl: _dio.options.baseUrl,
     );
-    return approvals.shifted(_clockOffset(res.headers.value('date')));
+    return approvals.shifted(_clockOffset(res.headers.value('date'), sentAt));
   }
 
-  /// How far ahead the phone's clock is of the server's.
-  Duration _clockOffset(String? dateHeader) {
+  /// How far ahead the phone's clock is of the server's, erring low so the
+  /// phone never shows more time than the server allows.
+  ///
+  /// The server stamped `Date` somewhere between [sentAt] and now on the
+  /// phone's clock, and `Date` is rounded down to the second. So the
+  /// smallest offset that fits is [sentAt] minus (`Date` + 1 s).
+  Duration _clockOffset(String? dateHeader, DateTime sentAt) {
     final server = parseHttpDate(dateHeader);
     if (server == null) return Duration.zero;
-    final offset = _now().difference(server);
-    return offset.abs() < clockSkewTolerance ? Duration.zero : offset;
+    final offset = sentAt.difference(server.add(const Duration(seconds: 1)));
+    return offset >= Duration.zero && offset < clockSkewTolerance
+        ? Duration.zero
+        : offset;
   }
 
   Future<void> approve(String id, ApprovalDecision decision) =>
