@@ -7,10 +7,12 @@ import '../features/approvals/presentation/screens/approvals_screen.dart';
 import '../features/audit/presentation/screens/audit_screen.dart';
 import '../features/auth/presentation/controllers/auth_controller.dart';
 import '../features/auth/presentation/screens/login_screen.dart';
+import '../features/loans/presentation/screens/loan_detail_screen.dart';
 import '../features/loans/presentation/screens/my_loans_screen.dart';
 import '../features/shell/presentation/screens/app_shell.dart';
 import '../features/splash/presentation/controllers/app_ready_provider.dart';
 import '../features/splash/presentation/screens/splash_screen.dart';
+import 'locations.dart';
 
 /// Where signed-in users land: the first tab of the shell.
 const homeLocation = '/approvals';
@@ -48,7 +50,10 @@ final routerProvider = Provider<GoRouter>((ref) {
   ref.listen(appReadyProvider, (_, _) => refresh.value++);
   ref.onDispose(refresh.dispose);
 
+  final rootNavigatorKey = GlobalKey<NavigatorState>();
+
   return GoRouter(
+    navigatorKey: rootNavigatorKey,
     initialLocation: '/splash',
     refreshListenable: refresh,
     redirect: (context, state) => authRedirect(
@@ -65,30 +70,52 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/login',
         pageBuilder: (_, state) => _fade(state, const LoginScreen()),
       ),
-      shellRoute(),
+      shellRoute(rootNavigatorKey: rootNavigatorKey),
     ],
   );
 });
 
 /// The signed-in tabs. Each branch keeps its own stack, so switching tabs
 /// doesn't lose where you were. Branch order must match [shellTabs].
-StatefulShellRoute shellRoute() => StatefulShellRoute.indexedStack(
-  pageBuilder: (_, state, navigationShell) =>
-      _fade(state, AppShell(navigationShell: navigationShell)),
-  branches: [
-    _tab('/approvals', const ApprovalsScreen()),
-    _tab('/loans', const MyLoansScreen()),
-    _tab('/alerts', const AlertsScreen()),
-    _tab('/audit', const AuditScreen()),
-  ],
-);
+///
+/// Screens opened from a tab, such as a loan from Alerts (see
+/// [alertLoanLocation]), cover the whole shell with their own app bar when
+/// [rootNavigatorKey] is the router's navigator key. Without it they open
+/// inside the tab.
+StatefulShellRoute shellRoute({GlobalKey<NavigatorState>? rootNavigatorKey}) =>
+    StatefulShellRoute.indexedStack(
+      pageBuilder: (_, state, navigationShell) =>
+          _fade(state, AppShell(navigationShell: navigationShell)),
+      branches: [
+        _tab('/approvals', const ApprovalsScreen()),
+        _tab('/loans', const MyLoansScreen()),
+        _tab(
+          '/alerts',
+          const AlertsScreen(),
+          routes: [
+            GoRoute(
+              path: 'loans/:loanId',
+              parentNavigatorKey: rootNavigatorKey,
+              builder: (_, state) =>
+                  LoanDetailScreen(loanId: state.pathParameters['loanId']!),
+            ),
+          ],
+        ),
+        _tab('/audit', const AuditScreen()),
+      ],
+    );
 
-StatefulShellBranch _tab(String path, Widget screen) => StatefulShellBranch(
+StatefulShellBranch _tab(
+  String path,
+  Widget screen, {
+  List<RouteBase> routes = const [],
+}) => StatefulShellBranch(
   routes: [
     // No transition: the bottom bar stays put and only the body swaps.
     GoRoute(
       path: path,
       pageBuilder: (_, _) => NoTransitionPage(child: screen),
+      routes: routes,
     ),
   ],
 );
