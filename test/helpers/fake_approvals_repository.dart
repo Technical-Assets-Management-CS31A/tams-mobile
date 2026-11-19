@@ -11,6 +11,7 @@ PendingApproval approval(
   String itemName = 'Epson Projector',
   String assetCode = 'PRJ-0012',
   List<ApprovalItem>? items,
+  DateTime? requestedAt,
   DateTime? expiresAt,
   String? defaultRoomId = 'r-301',
   Duration defaultClassLength = const Duration(minutes: 90),
@@ -20,12 +21,24 @@ PendingApproval approval(
   studentNumber: '2023-00142',
   sectionCode: 'BSCS-3A',
   items: items ?? [ApprovalItem(name: itemName, assetCode: assetCode)],
-  requestedAt: DateTime.now().subtract(const Duration(seconds: 10)),
+  requestedAt:
+      requestedAt ?? DateTime.now().subtract(const Duration(seconds: 10)),
   expiresAt: expiresAt ?? DateTime.now().add(const Duration(seconds: 110)),
   roomOptions: const [room301, avr],
   defaultRoomId: defaultRoomId,
   defaultClassLength: defaultClassLength,
 );
+
+/// A clock that only moves when told to, for driving countdowns.
+class FakeClock {
+  FakeClock([DateTime? start]) : current = start ?? DateTime.now();
+
+  DateTime current;
+
+  DateTime call() => current;
+
+  void advance(Duration by) => current = current.add(by);
+}
 
 /// In-memory [ApprovalsRepository] that records the calls made to it.
 class FakeApprovalsRepository implements ApprovalsRepository {
