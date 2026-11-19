@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../routing/app_router.dart';
 import '../../../../routing/pending_location.dart';
+import '../../../alerts/presentation/controllers/alerts_controller.dart';
 import '../../../approvals/presentation/controllers/approvals_controller.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../../splash/presentation/controllers/app_ready_provider.dart';
@@ -74,14 +75,27 @@ class PushNotifications {
 
   void _opened(RemoteMessage message) {
     _refreshData(message);
+    // Tapping a notice is reading it, as tapping it in Alerts would be.
+    if (noticeId(message.data) case final id?) unawaited(_markRead(id));
     final location = locationForPush(message.data);
     if (location != null) open(location);
   }
 
-  /// A new request means the cached Pending Approvals list is stale.
+  /// A new request or notice means the cached list it belongs to is stale.
   void _refreshData(RemoteMessage message) {
     if (message.data['type'] == 'approval.requested') {
       _ref.invalidate(approvalsControllerProvider);
+    }
+    if (isAlertPush(message.data)) _ref.invalidate(alertsControllerProvider);
+  }
+
+  Future<void> _markRead(String id) async {
+    try {
+      await _ref.read(alertsRepositoryProvider).markRead(id);
+      // Reload so the unread dot and badge match the server.
+      _ref.invalidate(alertsControllerProvider);
+    } catch (e) {
+      debugPrint('Could not mark notification $id read: $e');
     }
   }
 
