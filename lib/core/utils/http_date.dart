@@ -16,12 +16,18 @@ DateTime? parseHttpDate(String? value) {
   if (m == null) return null;
   final month = _months[m[2]];
   if (month == null) return null;
-  return DateTime.utc(
-    int.parse(m[3]!),
-    month,
-    int.parse(m[1]!),
-    int.parse(m[4]!),
-    int.parse(m[5]!),
-    int.parse(m[6]!),
-  );
+  final year = int.parse(m[3]!);
+  final day = int.parse(m[1]!);
+  final hour = int.parse(m[4]!);
+  final minute = int.parse(m[5]!);
+  final second = int.parse(m[6]!);
+  // DateTime.utc would roll "32 Nov 25:61" over into a later date.
+  // RFC 9110 allows second 60 (a leap second); treat it as 59.
+  if (day < 1 || day > _daysIn(year, month)) return null;
+  if (hour > 23 || minute > 59 || second > 60) return null;
+  return DateTime.utc(year, month, day, hour, minute, second.clamp(0, 59));
 }
+
+int _daysIn(int year, int month) =>
+    // Day 0 of the next month is the last day of this one.
+    DateTime.utc(year, month + 1, 0).day;
