@@ -161,6 +161,58 @@ void main() {
       http.error = DioExceptionType.connectionError;
       await expectLater(repo.pending(), throwsA(isA<Failure>()));
     });
+
+    group('clock skew', () {
+      // The server answered at 02:00:30 UTC, 30 s into the 120 s window.
+      const serverDate = 'Wed, 18 Nov 2026 02:00:30 GMT';
+      final serverNow = DateTime.utc(2026, 11, 18, 2, 0, 30);
+      final serverExpiry = DateTime.utc(2026, 11, 18, 2, 2);
+
+      Future<PendingApproval> fetchWithPhoneAt(DateTime phoneNow) {
+        final dio = Dio(BaseOptions(baseUrl: 'http://test.local/api'))
+          ..httpClientAdapter = http;
+        http
+          ..body = {
+            'items': [_item()],
+          }
+          ..headers = {
+            'date': [serverDate],
+          };
+        return ApprovalsRepositoryImpl(
+          ApprovalsRemoteDataSource(dio, now: () => phoneNow),
+        ).pending().then((p) => p.items.single);
+      }
+
+      test('a phone clock that runs ahead still shows 90 s left', () async {
+        final phoneNow = serverNow.add(const Duration(seconds: 25));
+        final r = await fetchWithPhoneAt(phoneNow);
+        expect(r.timeLeft(phoneNow), const Duration(seconds: 90));
+        expect(
+          r.expiresAt.difference(r.requestedAt),
+          const Duration(minutes: 2),
+        );
+      });
+
+      test('a phone clock that runs behind still shows 90 s left', () async {
+        final phoneNow = serverNow.subtract(const Duration(minutes: 3));
+        final r = await fetchWithPhoneAt(phoneNow);
+        expect(r.timeLeft(phoneNow), const Duration(seconds: 90));
+      });
+
+      test('differences under 3 s are ignored', () async {
+        final phoneNow = serverNow.add(const Duration(seconds: 2));
+        final r = await fetchWithPhoneAt(phoneNow);
+        expect(r.expiresAt, serverExpiry.toLocal());
+      });
+
+      test('without a Date header the server times are used', () async {
+        http.body = {
+          'items': [_item()],
+        };
+        final r = (await repo.pending()).items.single;
+        expect(r.expiresAt, serverExpiry.toLocal());
+      });
+    });
   });
 
   group('approve', () {
