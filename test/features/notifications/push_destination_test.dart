@@ -29,6 +29,39 @@ void main() {
     }
   });
 
+  group('notice pushes (tams-backend NoticePush)', () {
+    Map<String, dynamic> notice({Object? payload}) => {
+      'type': 'notice',
+      'notificationId': 'n-1',
+      'noticeType': 'LOAN_OVERDUE',
+      'payload': ?payload,
+    };
+
+    test('a notice about a loan opens that loan from Alerts', () {
+      final data = notice(
+        payload:
+            '{"type":"notice","loanId":"loan-7","noticeType":"LOAN_OVERDUE"}',
+      );
+      expect(locationForPush(data), '/alerts/loans/loan-7');
+      expect(noticeId(data), 'n-1');
+      expect(isAlertPush(data), isTrue);
+    });
+
+    test('a notice without a loan opens Alerts', () {
+      expect(locationForPush(notice()), '/alerts');
+      expect(locationForPush(notice(payload: '{"loanId":null}')), '/alerts');
+      expect(locationForPush(notice(payload: 'not json')), '/alerts');
+    });
+
+    test('only notices carry a notification to mark read', () {
+      expect(
+        noticeId({'type': 'approval.requested', 'notificationId': 'x'}),
+        isNull,
+      );
+      expect(isAlertPush({'type': 'approval.requested'}), isFalse);
+    });
+  });
+
   test('every destination is a shell tab', () {
     expect(
       pushDestinations.values.toSet(),
