@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/utils/clock.dart';
 import '../../domain/entities/pending_approval.dart';
-import 'approval_card.dart' show Countdown;
+import 'countdown.dart';
 import 'student_avatar.dart';
 
 /// Opens the approve sheet for [request]. Returns the instructor's choice,
