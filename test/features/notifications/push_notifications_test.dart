@@ -5,16 +5,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:tams_mobile/core/errors/failures.dart';
+import 'package:tams_mobile/features/alerts/presentation/controllers/alerts_controller.dart';
 import 'package:tams_mobile/features/approvals/domain/entities/pending_approval.dart';
 import 'package:tams_mobile/features/approvals/presentation/controllers/approvals_controller.dart';
 import 'package:tams_mobile/features/auth/domain/entities/user.dart';
 import 'package:tams_mobile/features/auth/presentation/controllers/auth_controller.dart';
+import 'package:tams_mobile/features/loans/domain/entities/loan_detail.dart';
+import 'package:tams_mobile/features/loans/domain/repositories/loans_repository.dart';
+import 'package:tams_mobile/features/loans/presentation/controllers/loan_detail_provider.dart';
 import 'package:tams_mobile/features/notifications/data/push_messaging.dart';
 import 'package:tams_mobile/features/notifications/presentation/controllers/push_notifications.dart';
 import 'package:tams_mobile/features/splash/presentation/controllers/app_ready_provider.dart';
 import 'package:tams_mobile/routing/app_router.dart';
 import 'package:tams_mobile/routing/pending_location.dart';
 
+import '../../helpers/fake_alerts_repository.dart';
 import '../../helpers/fake_approvals_repository.dart';
 
 class _FakeMessaging implements PushMessaging {
@@ -68,13 +74,39 @@ RemoteMessage _push(String type, {String? title = 'Title', String? body}) =>
           : RemoteNotification(title: title, body: body),
     );
 
+/// Loan details fail at once, so the screen settles without the network.
+class _NoLoans implements LoansRepository {
+  @override
+  Future<LoanDetail> detail(String id) async =>
+      throw const Failure('Offline in tests.');
+}
+
+RemoteMessage _notice({String? loanId = 'loan-7'}) => RemoteMessage(
+  data: {
+    'type': 'notice',
+    'notificationId': 'n-1',
+    'noticeType': 'LOAN_OVERDUE',
+    'payload':
+        '{"type":"notice","notificationId":"n-1","loanId":'
+        '${loanId == null ? 'null' : '"$loanId"'}}',
+  },
+  notification: const RemoteNotification(title: 'Loan overdue', body: 'Due'),
+);
+
 class _Harness {
-  _Harness(this.container, this.router, this.messaging, this.approvals);
+  _Harness(
+    this.container,
+    this.router,
+    this.messaging,
+    this.approvals,
+    this.alerts,
+  );
 
   final ProviderContainer container;
   final GoRouter router;
   final _FakeMessaging messaging;
   final FakeApprovalsRepository approvals;
+  final FakeAlertsRepository alerts;
 
   String get location => router.routerDelegate.currentConfiguration.uri.path;
 }
@@ -88,9 +120,12 @@ Future<_Harness> _pump(
   final messaging = _FakeMessaging()..initial = initialMessage;
   addTearDown(messaging.close);
   final approvals = FakeApprovalsRepository();
+  final alerts = FakeAlertsRepository();
+  final rootKey = GlobalKey<NavigatorState>();
   final router = GoRouter(
+    navigatorKey: rootKey,
     initialLocation: initialLocation,
-    routes: [shellRoute()],
+    routes: [shellRoute(rootNavigatorKey: rootKey)],
   );
   addTearDown(router.dispose);
 
@@ -103,6 +138,8 @@ Future<_Harness> _pump(
       appReadyProvider.overrideWith((ref) async {}),
       routerProvider.overrideWithValue(router),
       approvalsRepositoryProvider.overrideWithValue(approvals),
+      alertsRepositoryProvider.overrideWithValue(alerts),
+      loansRepositoryProvider.overrideWithValue(_NoLoans()),
     ],
   );
   addTearDown(container.dispose);
@@ -120,7 +157,7 @@ Future<_Harness> _pump(
   );
   await container.read(pushNotificationsProvider).start();
   await tester.pumpAndSettle();
-  return _Harness(container, router, messaging, approvals);
+  return _Harness(container, router, messaging, approvals, alerts);
 }
 
 void main() {
@@ -142,6 +179,35 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(h.location, '/alerts');
+    });
+
+    testWidgets('a notice opens its loan over Alerts and marks it read', (
+      tester,
+    ) async {
+      final h = await _pump(tester);
+
+      h.messaging.opened.add(_notice());
+      await tester.pumpAndSettle();
+
+      expect(h.location, '/alerts/loans/loan-7');
+      expect(h.alerts.markedRead, ['n-1']);
+      expect(find.text("Couldn't load this loan"), findsOneWidget);
+      expect(find.byType(NavigationBar), findsNothing, reason: 'full screen');
+
+      // Back goes to the Alerts tab, not out of the app.
+      h.router.pop();
+      await tester.pumpAndSettle();
+      expect(h.location, '/alerts');
+    });
+
+    testWidgets('a notice without a loan opens Alerts', (tester) async {
+      final h = await _pump(tester);
+
+      h.messaging.opened.add(_notice(loanId: null));
+      await tester.pumpAndSettle();
+
+      expect(h.location, '/alerts');
+      expect(h.alerts.markedRead, ['n-1']);
     });
 
     testWidgets('one that launched the app opens its screen', (tester) async {
