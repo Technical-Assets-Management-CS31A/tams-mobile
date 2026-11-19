@@ -387,17 +387,98 @@ void main() {
       expect(find.byKey(const Key('approval-expired')), findsOneWidget);
     });
 
-    testWidgets('pull to refresh clears expired requests the server dropped', (
+    testWidgets('pull to refresh keeps expired requests until dismissed', (
       tester,
     ) async {
       final repo = await _pump(tester, requests: [fresh('a')], clock: clock);
       await elapse(tester, const Duration(seconds: 121));
       expect(find.byKey(const Key('approval-expired')), findsOneWidget);
 
+      // The server leaves expired requests out.
       repo.result = PendingApprovals.empty;
       await tester.fling(find.text('Maria Santos'), const Offset(0, 400), 1000);
       await tester.pumpAndSettle();
+      expect(repo.pendingCalls, 2);
+      expect(find.byKey(const Key('approval-expired')), findsOneWidget);
+
+      await tester.tap(_onCard('Maria Santos', find.text('Dismiss')));
+      await tester.pumpAndSettle();
       expect(find.text('No pending approvals'), findsOneWidget);
+    });
+
+    testWidgets('a new request push keeps expired cards on screen', (
+      tester,
+    ) async {
+      final repo = await _pump(tester, requests: [fresh('a')], clock: clock);
+      await elapse(tester, const Duration(seconds: 121));
+
+      repo.result = PendingApprovals(
+        items: [
+          approval(
+            'b',
+            studentName: 'John Dela Cruz',
+            requestedAt: clock(),
+            expiresAt: clock().add(const Duration(seconds: 120)),
+          ),
+        ],
+      );
+      // What push_notifications.dart does for `approval.requested`.
+      ProviderScope.containerOf(tester.element(find.byType(ApprovalsScreen)))
+          .invalidate(approvalsControllerProvider);
+      await tester.pumpAndSettle();
+
+      expect(repo.pendingCalls, 2);
+      expect(_onCard('Maria Santos', find.text('Expired')), findsOneWidget);
+      expect(_onCard('John Dela Cruz', find.text('2:00 left')), findsOneWidget);
+    });
+
+    testWidgets('an expired answer shows expired at once, not after a tick', (
+      tester,
+    ) async {
+      final repo = await _pump(tester, requests: [fresh('a')], clock: clock);
+      await elapse(tester, const Duration(seconds: 119));
+      expect(_onCard('Maria Santos', find.text('0:01 left')), findsOneWidget);
+
+      // Half a second passes on the way to the server, which says the
+      // request expired (the phone still had it at "0:01 left").
+      repo.whileDeciding = () {
+        clock.advance(const Duration(milliseconds: 500));
+      };
+      repo.decisionError = const ApprovalFailure(
+        'This request timed out and the borrow was denied.',
+        code: ApprovalFailure.expired,
+        requestGone: true,
+      );
+      await tester.tap(_declineOn('Maria Santos'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('decline-confirm')));
+      // Less than one tick: only the decision's answer may update the card.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(repo.declined, isEmpty);
+      expect(find.byKey(const Key('approval-expired')), findsOneWidget);
+      expect(_approveOn('Maria Santos'), findsNothing);
+      expect(_onCard('Maria Santos', find.text('0:01 left')), findsNothing);
+    });
+
+    testWidgets('the countdown pauses in the background and catches up', (
+      tester,
+    ) async {
+      await _pump(tester, requests: [fresh('a')], clock: clock);
+      final binding = tester.binding;
+
+      binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+      binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await elapse(tester, const Duration(seconds: 10));
+      expect(_onCard('Maria Santos', find.text('2:00 left')), findsOneWidget);
+
+      binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+      binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+      binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pump();
+      expect(_onCard('Maria Santos', find.text('1:50 left')), findsOneWidget);
     });
   });
 
