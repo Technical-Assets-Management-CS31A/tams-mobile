@@ -2,12 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:tams_mobile/core/network/token_provider.dart';
+import 'package:tams_mobile/features/alerts/presentation/controllers/alerts_controller.dart';
 import 'package:tams_mobile/features/approvals/presentation/controllers/approvals_controller.dart';
 import 'package:tams_mobile/routing/app_router.dart';
 
+import '../../helpers/fake_alerts_repository.dart';
 import '../../helpers/fake_approvals_repository.dart';
 
-Future<GoRouter> _pumpShell(WidgetTester tester) async {
+Future<GoRouter> _pumpShell(
+  WidgetTester tester, {
+  FakeAlertsRepository? alerts,
+}) async {
   final router = GoRouter(
     initialLocation: homeLocation,
     routes: [shellRoute()],
@@ -20,6 +26,10 @@ Future<GoRouter> _pumpShell(WidgetTester tester) async {
         approvalsRepositoryProvider.overrideWithValue(
           FakeApprovalsRepository(),
         ),
+        alertsRepositoryProvider.overrideWithValue(
+          alerts ?? FakeAlertsRepository(),
+        ),
+        authTokenProvider.overrideWith(SignedInToken.new),
       ],
       child: MaterialApp.router(routerConfig: router),
     ),
@@ -36,6 +46,28 @@ void main() {
     expect(find.byType(NavigationDestination), findsNWidgets(4));
     expect(find.text('No pending approvals'), findsOneWidget);
     expect(find.byTooltip('Sign out'), findsOneWidget);
+  });
+
+  testWidgets('the Alerts tab shows the unread count', (tester) async {
+    await _pumpShell(
+      tester,
+      alerts: FakeAlertsRepository([
+        alert('a'),
+        alert('b'),
+        alert('c', read: true),
+      ]),
+    );
+    final badge = find.byKey(const Key('alerts-badge'));
+    expect(badge, findsOneWidget);
+    expect(
+      find.descendant(of: badge, matching: find.text('2')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('no badge when everything is read', (tester) async {
+    await _pumpShell(tester);
+    expect(find.byKey(const Key('alerts-badge')), findsNothing);
   });
 
   testWidgets('each tab shows its own title and empty state', (tester) async {
