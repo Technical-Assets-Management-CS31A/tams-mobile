@@ -20,19 +20,31 @@ final approvalsRepositoryProvider = Provider<ApprovalsRepository>(
 /// `GET /approvals/pending`.
 ///
 /// Requests whose 120 s run out stay in the list, shown as expired, until
-/// they are dismissed or the list is reloaded (the server drops them).
+/// they are dismissed, even across reloads (a new request's push reloads
+/// the list, and the server leaves expired requests out).
 class ApprovalsController extends AsyncNotifier<PendingApprovals> {
   ApprovalsRepository get _repo => ref.read(approvalsRepositoryProvider);
 
+  // Also runs again when a push invalidates the provider; [state] still
+  // holds the previous list then.
   @override
   Future<PendingApprovals> build() =>
-      ref.watch(approvalsRepositoryProvider).pending();
+      _load(ref.watch(approvalsRepositoryProvider));
 
   /// Reloads the list, keeping the current one on screen meanwhile.
   /// Errors end up in [state].
   Future<void> refresh() async {
     if (state.hasError) state = const AsyncLoading();
-    state = await AsyncValue.guard(_repo.pending);
+    state = await AsyncValue.guard(() => _load(_repo));
+  }
+
+  /// Fetches the list, keeping the expired requests on screen.
+  Future<PendingApprovals> _load(ApprovalsRepository repo) async {
+    // Read before the await: ref can't be used once the provider is disposed.
+    final shown = state.value;
+    final clock = ref.read(clockProvider);
+    final fresh = await repo.pending();
+    return shown == null ? fresh : fresh.keepingExpired(shown, clock());
   }
 
   /// Approves [id] for the chosen room and class length. Throws a
