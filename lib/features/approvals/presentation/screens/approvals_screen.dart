@@ -31,19 +31,48 @@ class _ApprovalsScreenState extends ConsumerState<ApprovalsScreen> {
 
   Clock get _clock => ref.read(clockProvider);
 
+  late final AppLifecycleListener _lifecycle;
+
   @override
   void initState() {
     super.initState();
-    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted) setState(() => _now = _clock());
-    });
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) => _tick());
+    // The ticker skips rebuilds in the background; catch up on return.
+    _lifecycle = AppLifecycleListener(onResume: _catchUp);
   }
 
   @override
   void dispose() {
     _ticker?.cancel();
+    _lifecycle.dispose();
     super.dispose();
   }
+
+  /// Rebuilds only if a card on screen is still counting down. [_now]
+  /// moves on regardless, so a rebuild for any other reason (such as a new
+  /// request arriving) shows the right time.
+  void _tick() {
+    if (!mounted) return;
+    final shownAt = _now;
+    _now = _clock();
+    final requests = ref.read(approvalsControllerProvider).value?.items;
+    final counting = requests?.any((r) => !r.isExpired(shownAt)) ?? false;
+    if (counting && _inForeground) setState(() {});
+  }
+
+  void _catchUp() {
+    if (mounted) setState(() => _now = _clock());
+  }
+
+  static bool get _inForeground => switch (WidgetsBinding
+      .instance
+      .lifecycleState) {
+    AppLifecycleState.hidden ||
+    AppLifecycleState.paused ||
+    AppLifecycleState.detached => false,
+    // Includes inactive (e.g. the notification shade is down): still visible.
+    _ => true,
+  };
 
   ApprovalsController get _controller =>
       ref.read(approvalsControllerProvider.notifier);
@@ -195,7 +224,16 @@ class _ApprovalsScreenState extends ConsumerState<ApprovalsScreen> {
       _snack('Something went wrong. Please try again.');
       return false;
     } finally {
-      if (mounted) setState(() => _busy.remove(request.id));
+      // Also catch up the clock: if the server said the request expired,
+      // the controller marked it expired as of now, which may be up to a
+      // second after the last tick. With the older _now the card would
+      // briefly show Approve/Decline and "0:01 left" again.
+      if (mounted) {
+        setState(() {
+          _busy.remove(request.id);
+          _now = _clock();
+        });
+      }
     }
   }
 
