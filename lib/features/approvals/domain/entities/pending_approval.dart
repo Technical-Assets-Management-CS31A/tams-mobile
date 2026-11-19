@@ -112,6 +112,8 @@ class PendingApproval {
   PendingApproval expiredAt(DateTime at) =>
       isExpired(at) ? this : _copy(expiresAt: at);
 
+  // Copies every field. A new field must be added here too;
+  // pending_approval_test.dart checks that none are dropped.
   PendingApproval _copy({DateTime? requestedAt, DateTime? expiresAt}) =>
       PendingApproval(
         id: id,
@@ -155,6 +157,21 @@ class PendingApprovals {
     frozen: frozen,
     items: [for (final r in items) r.id == id ? update(r) : r],
   );
+
+  /// This list plus the requests from [shown] that had expired by [now] and
+  /// are missing here. The server leaves expired requests out, but they
+  /// stay on screen until the instructor dismisses them. They go first:
+  /// anything expired was requested before anything still pending.
+  PendingApprovals keepingExpired(PendingApprovals shown, DateTime now) {
+    final ids = {for (final r in items) r.id};
+    final expired = [
+      for (final r in shown.items)
+        if (r.isExpired(now) && !ids.contains(r.id)) r,
+    ];
+    return expired.isEmpty
+        ? this
+        : PendingApprovals(frozen: frozen, items: [...expired, ...items]);
+  }
 
   /// Every request's timestamps moved by [offset]; see
   /// [PendingApproval.shifted].
