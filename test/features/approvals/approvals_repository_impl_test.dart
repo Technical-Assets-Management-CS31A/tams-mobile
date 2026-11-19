@@ -183,24 +183,70 @@ void main() {
         ).pending().then((p) => p.items.single);
       }
 
-      test('a phone clock that runs ahead still shows 90 s left', () async {
+      // The server has 90 s left. `Date` drops the fraction of a second, so
+      // the phone assumes up to 1 s more has passed and shows 89 s: a little
+      // less than the server allows, never more.
+
+      test('a phone clock that runs ahead still shows 89 s left', () async {
         final phoneNow = serverNow.add(const Duration(seconds: 25));
         final r = await fetchWithPhoneAt(phoneNow);
-        expect(r.timeLeft(phoneNow), const Duration(seconds: 90));
+        expect(r.timeLeft(phoneNow), const Duration(seconds: 89));
         expect(
           r.expiresAt.difference(r.requestedAt),
           const Duration(minutes: 2),
         );
       });
 
-      test('a phone clock that runs behind still shows 90 s left', () async {
+      test('a phone clock that runs behind still shows 89 s left', () async {
         final phoneNow = serverNow.subtract(const Duration(minutes: 3));
         final r = await fetchWithPhoneAt(phoneNow);
-        expect(r.timeLeft(phoneNow), const Duration(seconds: 90));
+        expect(r.timeLeft(phoneNow), const Duration(seconds: 89));
       });
 
-      test('differences under 3 s are ignored', () async {
-        final phoneNow = serverNow.add(const Duration(seconds: 2));
+      test(
+        'a phone clock in sync never shows more time than the server',
+        () async {
+          // Even a phone clock a little behind ends the countdown in time.
+          for (final behind in [0, 1, 2]) {
+            final phoneNow = serverNow.subtract(Duration(seconds: behind));
+            final r = await fetchWithPhoneAt(phoneNow);
+            expect(r.timeLeft(phoneNow), const Duration(seconds: 89));
+          }
+        },
+      );
+
+      test('the offset is measured from when the request was sent', () async {
+        // The response took 5 s to arrive; the server's 02:00:30 matches
+        // the phone's clock when the request went out, not when it came back.
+        final sentAt = serverNow;
+        var phoneNow = sentAt;
+        final dio = Dio(BaseOptions(baseUrl: 'http://test.local/api'))
+          ..httpClientAdapter = http
+          ..interceptors.add(
+            InterceptorsWrapper(
+              onResponse: (res, handler) {
+                phoneNow = phoneNow.add(const Duration(seconds: 5));
+                handler.next(res);
+              },
+            ),
+          );
+        http
+          ..body = {
+            'items': [_item()],
+          }
+          ..headers = {
+            'date': [serverDate],
+          };
+        final r = (await ApprovalsRepositoryImpl(
+          ApprovalsRemoteDataSource(dio, now: () => phoneNow),
+        ).pending()).items.single;
+        // Measured on arrival, the delay would look like the phone's clock
+        // running 5 s ahead and add 5 s to the countdown.
+        expect(r.timeLeft(sentAt), const Duration(seconds: 89));
+      });
+
+      test('a phone clock ahead by under 3 s is used as is', () async {
+        final phoneNow = serverNow.add(const Duration(seconds: 3));
         final r = await fetchWithPhoneAt(phoneNow);
         expect(r.expiresAt, serverExpiry.toLocal());
       });
