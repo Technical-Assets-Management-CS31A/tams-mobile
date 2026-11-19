@@ -27,10 +27,55 @@ void main() {
   });
 
   test('timeLeft', () {
+    expect(timeLeft(const Duration(seconds: 120)), '2:00 left');
     expect(timeLeft(const Duration(seconds: 102)), '1:42 left');
     expect(timeLeft(const Duration(seconds: 5)), '0:05 left');
+    // Rounds up: never "0:00 left" while there is still time.
+    expect(timeLeft(const Duration(milliseconds: 4200)), '0:05 left');
+    expect(timeLeft(const Duration(milliseconds: 1)), '0:01 left');
     expect(timeLeft(Duration.zero), 'Expired');
     expect(timeLeft(const Duration(seconds: -3)), 'Expired');
+  });
+
+  group('approval window', () {
+    final t0 = DateTime(2026, 11, 18, 9);
+    final r = approval(
+      'a',
+      requestedAt: t0,
+      expiresAt: t0.add(const Duration(seconds: 120)),
+    );
+
+    test('time and fraction left count down to zero', () {
+      expect(r.timeLeft(t0), const Duration(seconds: 120));
+      expect(r.fractionLeft(t0), 1);
+      final half = t0.add(const Duration(seconds: 60));
+      expect(r.timeLeft(half), const Duration(seconds: 60));
+      expect(r.fractionLeft(half), 0.5);
+      expect(r.isExpired(half), isFalse);
+
+      final end = t0.add(const Duration(seconds: 120));
+      expect(r.isExpired(end), isTrue);
+      expect(r.timeLeft(end), Duration.zero);
+      expect(r.fractionLeft(end.add(const Duration(seconds: 5))), 0);
+    });
+
+    test('expiredAt ends the window early, never extends it', () {
+      final at = t0.add(const Duration(seconds: 30));
+      expect(r.expiredAt(at).isExpired(at), isTrue);
+      expect(r.expiredAt(at).studentName, r.studentName);
+      final late = t0.add(const Duration(seconds: 200));
+      expect(r.expiredAt(late).expiresAt, r.expiresAt);
+    });
+
+    test('shifted moves both timestamps', () {
+      final s = r.shifted(const Duration(seconds: -20));
+      expect(s.requestedAt, t0.subtract(const Duration(seconds: 20)));
+      expect(
+        s.expiresAt.difference(s.requestedAt),
+        const Duration(seconds: 120),
+      );
+      expect(identical(r.shifted(Duration.zero), r), isTrue);
+    });
   });
 
   test('room label', () {
@@ -104,18 +149,42 @@ void main() {
       expect(await ids(), ['a', 'b', 'c']);
     });
 
-    test('an expired request leaves the list and rethrows', () async {
+    test('a request the server says expired stays, marked expired', () async {
       await ids();
       repo.decisionError = const ApprovalFailure(
         'Timed out',
-        code: 'APPROVAL_EXPIRED',
+        code: ApprovalFailure.expired,
         requestGone: true,
       );
       await expectLater(
         controller().decline('b'),
         throwsA(isA<ApprovalFailure>()),
       );
+      expect(await ids(), ['a', 'b', 'c']);
+      final items = container.read(approvalsControllerProvider).value!.items;
+      final now = DateTime.now();
+      expect([for (final r in items) r.isExpired(now)], [false, true, false]);
+    });
+
+    test('a request decided elsewhere leaves the list', () async {
+      await ids();
+      repo.decisionError = const ApprovalFailure(
+        'Already decided',
+        code: 'APPROVAL_ALREADY_DECIDED',
+        requestGone: true,
+      );
+      await expectLater(
+        controller().approve('b', decision),
+        throwsA(isA<ApprovalFailure>()),
+      );
       expect(await ids(), ['a', 'c']);
+    });
+
+    test('dismiss takes a request off the list', () async {
+      await ids();
+      controller().dismiss('c');
+      expect(await ids(), ['a', 'b']);
+      expect(repo.declined, isEmpty);
     });
 
     test('refresh reloads, and load errors end up in the state', () async {
