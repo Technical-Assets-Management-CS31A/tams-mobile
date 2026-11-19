@@ -13,6 +13,9 @@ class FakeHttpAdapter implements HttpClientAdapter {
   Object body;
   DioExceptionType? error;
 
+  /// Extra response headers, e.g. `{'date': ['Wed, 18 Nov 2026 ...']}`.
+  Map<String, List<String>> headers = {};
+
   /// Last request seen, so tests can inspect what was sent.
   RequestOptions? lastRequest;
 
@@ -31,6 +34,7 @@ class FakeHttpAdapter implements HttpClientAdapter {
       statusCode,
       headers: {
         Headers.contentTypeHeader: [Headers.jsonContentType],
+        ...headers,
       },
     );
   }
