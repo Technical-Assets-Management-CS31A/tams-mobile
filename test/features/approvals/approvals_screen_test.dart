@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tams_mobile/core/errors/failures.dart';
+import 'package:tams_mobile/core/utils/clock.dart';
 import 'package:tams_mobile/features/approvals/domain/entities/pending_approval.dart';
 import 'package:tams_mobile/features/approvals/domain/repositories/approvals_repository.dart';
 import 'package:tams_mobile/features/approvals/presentation/controllers/approvals_controller.dart';
@@ -14,6 +15,7 @@ Future<FakeApprovalsRepository> _pump(
   WidgetTester tester, {
   List<PendingApproval>? requests,
   FakeApprovalsRepository? repo,
+  FakeClock? clock,
 }) async {
   final fake =
       repo ??
@@ -31,7 +33,10 @@ Future<FakeApprovalsRepository> _pump(
       );
   await tester.pumpWidget(
     ProviderScope(
-      overrides: [approvalsRepositoryProvider.overrideWithValue(fake)],
+      overrides: [
+        approvalsRepositoryProvider.overrideWithValue(fake),
+        clockProvider.overrideWithValue((clock ?? FakeClock()).call),
+      ],
       child: const MaterialApp(home: Scaffold(body: ApprovalsScreen())),
     ),
   );
@@ -204,13 +209,13 @@ void main() {
     expect(find.text('Declined request from Maria Santos'), findsOneWidget);
   });
 
-  testWidgets('an expired decline removes the request and says so', (
+  testWidgets('a decline the server says expired marks the card expired', (
     tester,
   ) async {
     final repo = FakeApprovalsRepository([approval('a')])
       ..decisionError = const ApprovalFailure(
         'This request timed out and the borrow was denied.',
-        code: 'APPROVAL_EXPIRED',
+        code: ApprovalFailure.expired,
         requestGone: true,
       );
     await _pump(tester, repo: repo);
@@ -224,27 +229,176 @@ void main() {
       find.text('This request timed out and the borrow was denied.'),
       findsOneWidget,
     );
-    expect(find.text('No pending approvals'), findsOneWidget);
+    expect(find.byKey(const Key('approval-expired')), findsOneWidget);
+    expect(_onCard('Maria Santos', find.text('Expired')), findsOneWidget);
   });
 
-  testWidgets('requests drop off once their 120 s run out', (tester) async {
-    await _pump(
-      tester,
-      requests: [
+  group('120 s countdown', () {
+    late FakeClock clock;
+    late DateTime t0;
+
+    /// A request made at [t0], expiring 120 s later.
+    PendingApproval fresh(String id, {String studentName = 'Maria Santos'}) =>
         approval(
-          'a',
-          expiresAt: DateTime.now().add(const Duration(seconds: 2)),
+          id,
+          studentName: studentName,
+          requestedAt: t0,
+          expiresAt: t0.add(const Duration(seconds: 120)),
+        );
+
+    /// Moves the clock on and lets the screen's ticker see it.
+    Future<void> elapse(WidgetTester tester, Duration by) async {
+      clock.advance(by);
+      await tester.pump(const Duration(seconds: 1));
+    }
+
+    LinearProgressIndicator bar(WidgetTester tester, String student) =>
+        tester.widget(_onCard(student, find.byType(LinearProgressIndicator)));
+
+    setUp(() {
+      t0 = DateTime(2026, 11, 18, 9);
+      clock = FakeClock(t0);
+    });
+
+    testWidgets('counts down every second with a shrinking bar', (
+      tester,
+    ) async {
+      await _pump(tester, requests: [fresh('a')], clock: clock);
+      expect(_onCard('Maria Santos', find.text('2:00 left')), findsOneWidget);
+      expect(bar(tester, 'Maria Santos').value, 1);
+
+      await elapse(tester, const Duration(seconds: 1));
+      expect(_onCard('Maria Santos', find.text('1:59 left')), findsOneWidget);
+
+      await elapse(tester, const Duration(seconds: 59));
+      expect(_onCard('Maria Santos', find.text('1:00 left')), findsOneWidget);
+      expect(bar(tester, 'Maria Santos').value, 0.5);
+    });
+
+    testWidgets('turns red in the last 30 s', (tester) async {
+      await _pump(tester, requests: [fresh('a')], clock: clock);
+      final theme = Theme.of(tester.element(find.byType(ApprovalsScreen)));
+      expect(bar(tester, 'Maria Santos').color, theme.colorScheme.primary);
+
+      await elapse(tester, const Duration(seconds: 91));
+      expect(_onCard('Maria Santos', find.text('0:29 left')), findsOneWidget);
+      expect(bar(tester, 'Maria Santos').color, theme.colorScheme.error);
+    });
+
+    testWidgets('switches to expired when time runs out, then dismisses', (
+      tester,
+    ) async {
+      final repo = await _pump(
+        tester,
+        requests: [
+          fresh('a'),
+          approval(
+            'b',
+            studentName: 'John Dela Cruz',
+            requestedAt: t0,
+            expiresAt: t0.add(const Duration(seconds: 200)),
+          ),
+        ],
+        clock: clock,
+      );
+
+      await elapse(tester, const Duration(seconds: 119));
+      expect(_onCard('Maria Santos', find.text('0:01 left')), findsOneWidget);
+      expect(_approveOn('Maria Santos'), findsOneWidget);
+
+      await elapse(tester, const Duration(seconds: 1));
+      // Still listed, but expired: no way to approve or decline it.
+      expect(find.text('Maria Santos'), findsOneWidget);
+      expect(_onCard('Maria Santos', find.text('Expired')), findsOneWidget);
+      expect(
+        _onCard(
+          'Maria Santos',
+          find.text('No decision in time, so the borrow was denied.'),
         ),
-      ],
-    );
-    expect(find.text('Maria Santos'), findsOneWidget);
+        findsOneWidget,
+      );
+      expect(_approveOn('Maria Santos'), findsNothing);
+      expect(_declineOn('Maria Santos'), findsNothing);
+      expect(bar(tester, 'Maria Santos').value, 0);
+      // The other request is unaffected.
+      expect(_onCard('John Dela Cruz', find.text('1:20 left')), findsOneWidget);
 
-    // The countdown uses the real clock, so let real time pass.
-    await tester.runAsync(() => Future.delayed(const Duration(seconds: 3)));
-    await tester.pump(const Duration(seconds: 1));
+      await tester.tap(_onCard('Maria Santos', find.text('Dismiss')));
+      await tester.pumpAndSettle();
+      expect(find.text('Maria Santos'), findsNothing);
+      expect(find.text('John Dela Cruz'), findsOneWidget);
+      expect(repo.declined, isEmpty);
+      expect(repo.approved, isEmpty);
+    });
 
-    expect(find.text('Maria Santos'), findsNothing);
-    expect(find.text('No pending approvals'), findsOneWidget);
+    testWidgets('a request that arrives already expired shows as expired', (
+      tester,
+    ) async {
+      clock.advance(const Duration(seconds: 130));
+      await _pump(tester, requests: [fresh('a')], clock: clock);
+      expect(find.byKey(const Key('approval-expired')), findsOneWidget);
+      expect(find.text('No pending approvals'), findsNothing);
+    });
+
+    testWidgets('the approve sheet counts down and locks on expiry', (
+      tester,
+    ) async {
+      final repo = await _pump(tester, requests: [fresh('a')], clock: clock);
+      await elapse(tester, const Duration(seconds: 100));
+
+      await tester.tap(_approveOn('Maria Santos'));
+      await tester.pumpAndSettle();
+      final sheet = find.byType(BottomSheet);
+      expect(
+        find.descendant(of: sheet, matching: find.text('0:20 left')),
+        findsOneWidget,
+      );
+      final confirm = find.byKey(const Key('approve-confirm'));
+      expect(tester.widget<ButtonStyleButton>(confirm).onPressed, isNotNull);
+
+      await elapse(tester, const Duration(seconds: 20));
+      expect(
+        find.descendant(of: sheet, matching: find.text('Expired')),
+        findsOneWidget,
+      );
+      expect(
+        find.text('This request expired and the borrow was denied.'),
+        findsOneWidget,
+      );
+      expect(tester.widget<ButtonStyleButton>(confirm).onPressed, isNull);
+      expect(repo.approved, isEmpty);
+    });
+
+    testWidgets('a decline confirmed after expiry is not sent', (tester) async {
+      final repo = await _pump(tester, requests: [fresh('a')], clock: clock);
+
+      await tester.tap(_declineOn('Maria Santos'));
+      await tester.pumpAndSettle();
+      // The instructor waits too long on the dialog.
+      clock.advance(const Duration(seconds: 121));
+      await tester.tap(find.byKey(const Key('decline-confirm')));
+      await tester.pumpAndSettle();
+
+      expect(repo.declined, isEmpty);
+      expect(
+        find.text('This request timed out and the borrow was denied.'),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('approval-expired')), findsOneWidget);
+    });
+
+    testWidgets('pull to refresh clears expired requests the server dropped', (
+      tester,
+    ) async {
+      final repo = await _pump(tester, requests: [fresh('a')], clock: clock);
+      await elapse(tester, const Duration(seconds: 121));
+      expect(find.byKey(const Key('approval-expired')), findsOneWidget);
+
+      repo.result = PendingApprovals.empty;
+      await tester.fling(find.text('Maria Santos'), const Offset(0, 400), 1000);
+      await tester.pumpAndSettle();
+      expect(find.text('No pending approvals'), findsOneWidget);
+    });
   });
 
   testWidgets('frozen: banner shows and Approve is disabled', (tester) async {
