@@ -4,7 +4,8 @@ import 'package:tams_mobile/core/errors/failures.dart';
 import 'package:tams_mobile/features/approvals/domain/entities/pending_approval.dart';
 import 'package:tams_mobile/features/approvals/domain/repositories/approvals_repository.dart';
 import 'package:tams_mobile/features/approvals/presentation/controllers/approvals_controller.dart';
-import 'package:tams_mobile/features/approvals/presentation/widgets/approval_card.dart';
+import 'package:tams_mobile/core/utils/clock.dart';
+import 'package:tams_mobile/features/approvals/presentation/widgets/countdown.dart';
 import 'package:tams_mobile/features/approvals/presentation/widgets/student_avatar.dart';
 
 import '../../helpers/fake_approvals_repository.dart';
@@ -26,15 +27,15 @@ void main() {
     expect(initials(''), '?');
   });
 
-  test('timeLeft', () {
-    expect(timeLeft(const Duration(seconds: 120)), '2:00 left');
-    expect(timeLeft(const Duration(seconds: 102)), '1:42 left');
-    expect(timeLeft(const Duration(seconds: 5)), '0:05 left');
+  test('formatTimeLeft', () {
+    expect(formatTimeLeft(const Duration(seconds: 120)), '2:00 left');
+    expect(formatTimeLeft(const Duration(seconds: 102)), '1:42 left');
+    expect(formatTimeLeft(const Duration(seconds: 5)), '0:05 left');
     // Rounds up: never "0:00 left" while there is still time.
-    expect(timeLeft(const Duration(milliseconds: 4200)), '0:05 left');
-    expect(timeLeft(const Duration(milliseconds: 1)), '0:01 left');
-    expect(timeLeft(Duration.zero), 'Expired');
-    expect(timeLeft(const Duration(seconds: -3)), 'Expired');
+    expect(formatTimeLeft(const Duration(milliseconds: 4200)), '0:05 left');
+    expect(formatTimeLeft(const Duration(milliseconds: 1)), '0:01 left');
+    expect(formatTimeLeft(Duration.zero), 'Expired');
+    expect(formatTimeLeft(const Duration(seconds: -3)), 'Expired');
   });
 
   group('approval window', () {
@@ -75,6 +76,82 @@ void main() {
         const Duration(seconds: 120),
       );
       expect(identical(r.shifted(Duration.zero), r), isTrue);
+    });
+
+    test('shifted and expiredAt keep every other field', () {
+      // Every field set to something other than its default. A new field
+      // belongs here and in fields() below, and must survive the copy.
+      final full = PendingApproval(
+        id: 'full',
+        studentName: 'Maria Santos',
+        studentNumber: '2023-00142',
+        sectionCode: 'BSCS-3A',
+        photoUrl: 'http://test.local/api/approvals/full/photo',
+        items: const [
+          ApprovalItem(name: 'Epson Projector', assetCode: 'PRJ-0012'),
+          ApprovalItem(name: 'HDMI Cable', assetCode: 'CBL-0230'),
+        ],
+        requestedAt: t0,
+        expiresAt: t0.add(const Duration(seconds: 120)),
+        roomOptions: const [room301, avr],
+        defaultRoomId: 'r-avr',
+        classLengthOptions: const [Duration(minutes: 60)],
+        defaultClassLength: const Duration(minutes: 60),
+      );
+      List<Object?> fields(PendingApproval r) => [
+        r.id,
+        r.studentName,
+        r.studentNumber,
+        r.sectionCode,
+        r.photoUrl,
+        r.items,
+        r.roomOptions,
+        r.defaultRoomId,
+        r.classLengthOptions,
+        r.defaultClassLength,
+      ];
+
+      final shifted = full.shifted(const Duration(seconds: 7));
+      expect(fields(shifted), fields(full));
+      final expired = full.expiredAt(t0.add(const Duration(seconds: 30)));
+      expect(fields(expired), fields(full));
+      expect(expired.requestedAt, full.requestedAt);
+    });
+  });
+
+  group('keepingExpired', () {
+    final t0 = DateTime(2026, 11, 18, 9);
+    final old = approval(
+      'old',
+      requestedAt: t0,
+      expiresAt: t0.add(const Duration(seconds: 120)),
+    );
+    final pending = approval(
+      'new',
+      requestedAt: t0.add(const Duration(seconds: 100)),
+      expiresAt: t0.add(const Duration(seconds: 220)),
+    );
+    final later = t0.add(const Duration(seconds: 150));
+
+    test('keeps requests that expired and the server dropped, first', () {
+      final shown = PendingApprovals(items: [old, pending]);
+      final fresh = PendingApprovals(items: [pending], frozen: true);
+      final merged = fresh.keepingExpired(shown, later);
+      expect([for (final r in merged.items) r.id], ['old', 'new']);
+      expect(merged.frozen, isTrue);
+    });
+
+    test('drops requests that left the list for other reasons', () {
+      // Still pending when it left, so it was decided somewhere else.
+      final shown = PendingApprovals(items: [old, pending]);
+      final merged = PendingApprovals.empty.keepingExpired(shown, later);
+      expect([for (final r in merged.items) r.id], ['old']);
+    });
+
+    test('the server copy wins when a request is in both', () {
+      final shown = PendingApprovals(items: [old]);
+      final fresh = PendingApprovals(items: [old.shifted(Duration.zero)]);
+      expect(identical(fresh.keepingExpired(shown, later), fresh), isTrue);
     });
   });
 
@@ -198,6 +275,68 @@ void main() {
       repo.pendingError = const Failure('Offline');
       await controller().refresh();
       expect(container.read(approvalsControllerProvider).error, isA<Failure>());
+    });
+
+    group('expired requests survive reloads', () {
+      final t0 = DateTime(2026, 11, 18, 9);
+      late FakeClock clock;
+
+      setUp(() {
+        clock = FakeClock(t0);
+        repo = FakeApprovalsRepository([
+          approval(
+            'old',
+            requestedAt: t0,
+            expiresAt: t0.add(const Duration(seconds: 120)),
+          ),
+        ]);
+        container = ProviderContainer(
+          overrides: [
+            approvalsRepositoryProvider.overrideWithValue(repo),
+            clockProvider.overrideWithValue(clock.call),
+          ],
+        );
+        addTearDown(container.dispose);
+      });
+
+      /// The server has dropped 'old' (it expired) and has a new request.
+      void serverMovesOn() {
+        clock.advance(const Duration(seconds: 130));
+        repo.result = PendingApprovals(
+          items: [
+            approval(
+              'new',
+              requestedAt: clock(),
+              expiresAt: clock().add(const Duration(seconds: 120)),
+            ),
+          ],
+        );
+      }
+
+      test('when a push reloads the list', () async {
+        expect(await ids(), ['old']);
+        serverMovesOn();
+        // What push_notifications.dart does for `approval.requested`.
+        container.invalidate(approvalsControllerProvider);
+        expect(await ids(), ['old', 'new']);
+        expect(repo.pendingCalls, 2);
+      });
+
+      test('when pulled to refresh', () async {
+        expect(await ids(), ['old']);
+        serverMovesOn();
+        await controller().refresh();
+        expect(await ids(), ['old', 'new']);
+      });
+
+      test('until dismissed', () async {
+        expect(await ids(), ['old']);
+        serverMovesOn();
+        await controller().refresh();
+        controller().dismiss('old');
+        await controller().refresh();
+        expect(await ids(), ['new']);
+      });
     });
   });
 }
