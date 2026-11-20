@@ -25,7 +25,6 @@ class AlertsScreen extends ConsumerStatefulWidget {
 class _AlertsScreenState extends ConsumerState<AlertsScreen> {
   /// Keeps "5 min ago" current.
   Timer? _ticker;
-  late final AppLifecycleListener _lifecycle;
 
   AlertsController get _controller =>
       ref.read(alertsControllerProvider.notifier);
@@ -36,15 +35,12 @@ class _AlertsScreenState extends ConsumerState<AlertsScreen> {
     _ticker = Timer.periodic(const Duration(minutes: 1), (_) {
       if (mounted) setState(() {});
     });
-    // Notices pushed while the app was in the background but never tapped
-    // aren't in the list yet.
-    _lifecycle = AppLifecycleListener(onResume: () => _controller.refresh());
+    // AppShell reloads the list on resume, so the badge is current too.
   }
 
   @override
   void dispose() {
     _ticker?.cancel();
-    _lifecycle.dispose();
     super.dispose();
   }
 
