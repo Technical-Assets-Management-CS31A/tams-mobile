@@ -16,7 +16,8 @@ class AlertTile extends StatelessWidget {
   final Alert alert;
   final DateTime now;
 
-  /// Null when there's no loan to open.
+  /// Marks the alert read and, when it is about a loan, opens that loan.
+  /// Alerts without a loan stay tappable so they can still be marked read.
   final VoidCallback? onTap;
 
   @override
