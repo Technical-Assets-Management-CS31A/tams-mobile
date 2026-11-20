@@ -65,6 +65,28 @@ void main() {
     );
   });
 
+  testWidgets('coming back to the app updates the badge without opening '
+      'Alerts', (tester) async {
+    final alerts = FakeAlertsRepository([alert('a')]);
+    await _pumpShell(tester, alerts: alerts);
+    final badge = find.byKey(const Key('alerts-badge'));
+    expect(find.descendant(of: badge, matching: find.text('1')), findsOne);
+
+    // A notice pushed in the background, never tapped.
+    alerts.alerts = [alert('a'), alert('b')];
+    final binding = tester.binding;
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+
+    expect(find.text('No pending approvals'), findsOneWidget, reason: 'tab');
+    expect(find.descendant(of: badge, matching: find.text('2')), findsOne);
+  });
+
   testWidgets('no badge when everything is read', (tester) async {
     await _pumpShell(tester);
     expect(find.byKey(const Key('alerts-badge')), findsNothing);
