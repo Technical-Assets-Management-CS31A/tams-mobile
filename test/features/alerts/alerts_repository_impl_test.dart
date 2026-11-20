@@ -202,6 +202,24 @@ void main() {
       expect(feed.hasMore, isFalse);
     });
 
+    test('an empty page ends it even when short of the total', () {
+      // e.g. a malformed row was skipped, so items never reach total.
+      final feed = AlertsFeed.first(page([at('c', 3), at('b', 2)]));
+      expect(feed.hasMore, isTrue);
+
+      final ended = feed.adding(page([], page: 2));
+      expect(ended.items, hasLength(2));
+      expect(ended.hasMore, isFalse);
+      expect(
+        ended.markingRead('c', DateTime(2026, 11, 18, 12)).hasMore,
+        isFalse,
+      );
+    });
+
+    test('an empty first page has nothing more', () {
+      expect(AlertsFeed.first(page([])).hasMore, isFalse);
+    });
+
     test('marking read lowers the unread count once', () {
       final feed = AlertsFeed.first(page([at('a', 1), at('b', 2)]));
       final read = feed.markingRead('a', DateTime(2026, 11, 18, 12));
