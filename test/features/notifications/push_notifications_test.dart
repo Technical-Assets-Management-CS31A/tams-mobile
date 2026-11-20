@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:tams_mobile/core/errors/failures.dart';
+import 'package:tams_mobile/core/network/token_provider.dart';
 import 'package:tams_mobile/features/alerts/presentation/controllers/alerts_controller.dart';
 import 'package:tams_mobile/features/approvals/domain/entities/pending_approval.dart';
 import 'package:tams_mobile/features/approvals/presentation/controllers/approvals_controller.dart';
@@ -66,6 +67,18 @@ class _SignedOut extends AuthController {
   Future<User?> build() async => null;
 }
 
+/// Signed out until [restore], like a cold start before the saved session
+/// is read back.
+class _RestoredLater extends AuthController {
+  @override
+  Future<User?> build() async => null;
+
+  void restore() {
+    ref.read(authTokenProvider.notifier).set('t');
+    state = const AsyncData(User(email: 'a@b.c', token: 't'));
+  }
+}
+
 RemoteMessage _push(String type, {String? title = 'Title', String? body}) =>
     RemoteMessage(
       data: {'type': type},
@@ -114,6 +127,7 @@ class _Harness {
 Future<_Harness> _pump(
   WidgetTester tester, {
   bool signedIn = true,
+  AuthController Function()? auth,
   String initialLocation = '/approvals',
   RemoteMessage? initialMessage,
 }) async {
@@ -133,8 +147,10 @@ Future<_Harness> _pump(
     overrides: [
       pushMessagingProvider.overrideWithValue(messaging),
       authControllerProvider.overrideWith(
-        signedIn ? _SignedIn.new : _SignedOut.new,
+        auth ?? (signedIn ? _SignedIn.new : _SignedOut.new),
       ),
+      if (signedIn && auth == null)
+        authTokenProvider.overrideWith(SignedInToken.new),
       appReadyProvider.overrideWith((ref) async {}),
       routerProvider.overrideWithValue(router),
       approvalsRepositoryProvider.overrideWithValue(approvals),
@@ -200,6 +216,36 @@ void main() {
       expect(h.location, '/alerts');
     });
 
+    testWidgets('a notice reloads Alerts once, after marking it read', (
+      tester,
+    ) async {
+      final h = await _pump(tester);
+      expect(h.alerts.listedPages, [1], reason: 'badge on sign-in');
+
+      h.messaging.opened.add(_notice());
+      await tester.pumpAndSettle();
+
+      expect(h.alerts.markedRead, ['n-1']);
+      expect(h.alerts.listedPages, [1, 1]);
+    });
+
+    testWidgets('one that launched the app is marked read once the session '
+        'is restored', (tester) async {
+      final h = await _pump(
+        tester,
+        auth: _RestoredLater.new,
+        initialMessage: _notice(),
+      );
+      expect(h.alerts.markedRead, isEmpty, reason: 'no token yet');
+      expect(h.container.read(pendingLocationProvider), '/alerts/loans/loan-7');
+
+      (h.container.read(authControllerProvider.notifier) as _RestoredLater)
+          .restore();
+      await tester.pumpAndSettle();
+
+      expect(h.alerts.markedRead, ['n-1']);
+    });
+
     testWidgets('a notice without a loan opens Alerts', (tester) async {
       final h = await _pump(tester);
 
@@ -252,6 +298,21 @@ void main() {
       tester.widget<SnackBarAction>(find.byType(SnackBarAction)).onPressed();
       await tester.pumpAndSettle();
       expect(h.location, '/alerts');
+    });
+
+    testWidgets('View on a notice marks it read, as tapping the system '
+        'notification does', (tester) async {
+      final h = await _pump(tester);
+
+      h.messaging.foreground.add(_notice());
+      await _showSnackBar(tester);
+      expect(h.alerts.markedRead, isEmpty, reason: 'only seen, not opened');
+
+      tester.widget<SnackBarAction>(find.byType(SnackBarAction)).onPressed();
+      await tester.pumpAndSettle();
+
+      expect(h.location, '/alerts/loans/loan-7');
+      expect(h.alerts.markedRead, ['n-1']);
     });
 
     testWidgets('unknown type shows without a View button', (tester) async {
