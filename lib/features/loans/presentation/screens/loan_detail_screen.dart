@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/errors/failures.dart';
+import '../../../../core/network/auth_headers.dart';
+import '../../../../core/network/dio_client.dart';
 import '../../../../core/network/token_provider.dart';
 import '../../../../core/utils/clock.dart';
 import '../../../../core/utils/time_format.dart';
@@ -54,8 +56,13 @@ class _Body extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final token = ref.watch(authTokenProvider);
     final photo = loan.photoUrl;
+    // Only a photo on the API's own host gets the token.
+    final photoHeaders = authHeadersFor(
+      photo,
+      token: ref.watch(authTokenProvider),
+      apiBaseUrl: ref.watch(dioProvider).options.baseUrl,
+    );
     String at(DateTime t) => formatDateTime(t, now: now);
 
     final borrower = switch (loan) {
@@ -109,9 +116,7 @@ class _Body extends ConsumerWidget {
               child: Image.network(
                 photo,
                 fit: BoxFit.cover,
-                headers: token == null
-                    ? null
-                    : {'Authorization': 'Bearer $token'},
+                headers: photoHeaders,
                 errorBuilder: (_, _, _) => ColoredBox(
                   color: theme.colorScheme.surfaceContainerHighest,
                   child: const Center(child: Icon(Icons.broken_image_outlined)),
