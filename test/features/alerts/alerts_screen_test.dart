@@ -11,6 +11,23 @@ import 'package:tams_mobile/features/alerts/presentation/widgets/alert_tile.dart
 
 import '../../helpers/fake_alerts_repository.dart';
 
+/// Counts one row more than it serves, as when the repository skips a
+/// malformed row: the list never reaches `total`.
+class _OvercountingAlertsRepository extends FakeAlertsRepository {
+  _OvercountingAlertsRepository(super.alerts, super.pageSize);
+
+  @override
+  Future<AlertsPage> list({int page = 1}) async {
+    final served = await super.list(page: page);
+    return AlertsPage(
+      items: served.items,
+      page: served.page,
+      total: served.total + 1,
+      unreadCount: served.unreadCount,
+    );
+  }
+}
+
 class _Harness {
   _Harness(this.repo, this.router);
 
@@ -203,6 +220,27 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(repo.listedPages, [1, 2]);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+  });
+
+  testWidgets('stops asking after the last page when a row was skipped', (
+    tester,
+  ) async {
+    final repo = _OvercountingAlertsRepository([
+      for (var i = 0; i < 15; i++)
+        alert(
+          'a$i',
+          title: 'Alert $i',
+          ago: Duration(minutes: i + 1),
+        ),
+    ], 10);
+    await _pump(tester, repo: repo);
+
+    await tester.scrollUntilVisible(find.text('Alert 14'), 300);
+    // Would time out if every empty page set off another request.
+    await tester.pumpAndSettle();
+
+    expect(repo.listedPages, [1, 2, 3]);
     expect(find.byType(CircularProgressIndicator), findsNothing);
   });
 
