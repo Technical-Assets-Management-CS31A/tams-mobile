@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/errors/failures.dart';
+import '../../../../core/network/auth_headers.dart';
+import '../../../../core/network/dio_client.dart';
 import '../../../../core/network/token_provider.dart';
 import '../../../../core/utils/clock.dart';
 import '../../../../core/widgets/empty_state.dart';
@@ -81,9 +83,10 @@ class _ApprovalsScreenState extends ConsumerState<ApprovalsScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(approvalsControllerProvider);
     final token = ref.watch(authTokenProvider);
-    final photoHeaders = token == null
-        ? null
-        : {'Authorization': 'Bearer $token'};
+    final apiBaseUrl = ref.watch(dioProvider).options.baseUrl;
+    // Only photos on the API's own host get the token.
+    Map<String, String>? photoHeaders(String? url) =>
+        authHeadersFor(url, token: token, apiBaseUrl: apiBaseUrl);
 
     return switch (state) {
       AsyncValue(:final value?) => RefreshIndicator(
@@ -108,7 +111,10 @@ class _ApprovalsScreenState extends ConsumerState<ApprovalsScreen> {
     };
   }
 
-  Widget _list(PendingApprovals data, Map<String, String>? photoHeaders) {
+  Widget _list(
+    PendingApprovals data,
+    Map<String, String>? Function(String? url) photoHeaders,
+  ) {
     final requests = data.items;
 
     if (requests.isEmpty && !data.frozen) {
@@ -131,10 +137,10 @@ class _ApprovalsScreenState extends ConsumerState<ApprovalsScreen> {
             key: ValueKey(request.id),
             request: request,
             now: _now,
-            photoHeaders: photoHeaders,
+            photoHeaders: photoHeaders(request.photoUrl),
             busy: _busy.contains(request.id),
             canApprove: !data.frozen,
-            onApprove: () => _approve(request, photoHeaders),
+            onApprove: () => _approve(request, photoHeaders(request.photoUrl)),
             onDecline: () => _decline(request),
             onDismiss: () => _controller.dismiss(request.id),
           ),
