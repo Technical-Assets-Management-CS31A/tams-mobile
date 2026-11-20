@@ -144,6 +144,9 @@ Future<_Harness> _pump(
   addTearDown(router.dispose);
 
   final container = ProviderContainer(
+    // The loan screen's load fails on purpose; a retry timer left pending
+    // when a test ends on that screen would fail the test.
+    retry: (_, _) => null,
     overrides: [
       pushMessagingProvider.overrideWithValue(messaging),
       authControllerProvider.overrideWith(
