@@ -4,7 +4,9 @@ enum AlertKind {
   /// FR-6.1, US-07: the item wasn't tapped at the room in time.
   lateArrival,
 
-  /// FR-4.3: wrong room, transit timeout (staff copy) or unborrowed tap.
+  /// FR-4.3: an anomaly. Wrong-room and unborrowed taps both arrive as
+  /// `ANOMALY_RAISED` (tams-backend `DeviceEndpoints.RaiseAsync`; the title
+  /// says which); `TRANSIT_TIMEOUT` is the staff copy of a late arrival.
   anomaly,
 
   /// FR-6.3: due time passed and the item is still out.
@@ -130,6 +132,7 @@ class AlertsFeed {
     required this.unreadCount,
     required this.total,
     required this.page,
+    this.reachedEnd = false,
   });
 
   factory AlertsFeed.first(AlertsPage page) => AlertsFeed(
@@ -137,6 +140,7 @@ class AlertsFeed {
     unreadCount: page.unreadCount,
     total: page.total,
     page: page.page,
+    reachedEnd: page.items.isEmpty,
   );
 
   static const empty = AlertsFeed(items: [], unreadCount: 0, total: 0, page: 1);
@@ -148,7 +152,12 @@ class AlertsFeed {
   /// The last page loaded.
   final int page;
 
-  bool get hasMore => items.length < total;
+  /// The server sent an empty page: there is nothing after [page].
+  final bool reachedEnd;
+
+  /// [items] can stay short of [total] for good (a malformed row is
+  /// skipped, or one was deleted meanwhile), so an empty page also ends it.
+  bool get hasMore => !reachedEnd && items.length < total;
 
   /// With [next] added after the alerts already here. A row can show up
   /// on two pages when new ones arrive in between; it is kept once.
@@ -163,6 +172,7 @@ class AlertsFeed {
       unreadCount: next.unreadCount,
       total: next.total,
       page: next.page,
+      reachedEnd: next.items.isEmpty,
     );
   }
 
@@ -174,6 +184,7 @@ class AlertsFeed {
       unreadCount: unreadCount > 0 ? unreadCount - 1 : 0,
       total: total,
       page: page,
+      reachedEnd: reachedEnd,
     );
   }
 
