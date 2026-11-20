@@ -29,13 +29,38 @@ const shellTabs = [
 
 /// Signed-in frame: app bar, the current tab, and the bottom navigation bar.
 /// Each tab keeps its own navigation stack and scroll position.
-class AppShell extends ConsumerWidget {
+class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key, required this.navigationShell});
 
   final StatefulNavigationShell navigationShell;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<AppShell> createState() => _AppShellState();
+}
+
+class _AppShellState extends ConsumerState<AppShell> {
+  late final AppLifecycleListener _lifecycle;
+
+  @override
+  void initState() {
+    super.initState();
+    // Notices pushed while the app was in the background but never tapped
+    // aren't counted yet. Reloading here, not in AlertsScreen, keeps the
+    // badge current even when the Alerts tab was never opened.
+    _lifecycle = AppLifecycleListener(
+      onResume: () => ref.read(alertsControllerProvider.notifier).refresh(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final navigationShell = widget.navigationShell;
     final index = navigationShell.currentIndex;
     // Loads Alerts on sign-in, so the badge shows before the tab is opened.
     final unread = ref.watch(
