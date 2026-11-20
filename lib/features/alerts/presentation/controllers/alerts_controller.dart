@@ -30,12 +30,18 @@ class AlertsController extends AsyncNotifier<AlertsFeed> {
   }
 
   /// Reloads the first page, keeping the current list on screen meanwhile.
-  /// Errors end up in [state].
+  /// Errors end up in [state]. Does nothing when signed out.
   Future<void> refresh() async {
+    final token = ref.read(authTokenProvider);
+    if (token == null) return;
     if (state.hasError) state = const AsyncLoading();
-    state = await AsyncValue.guard(
+    final result = await AsyncValue.guard(
       () async => AlertsFeed.first(await _repo.list()),
     );
+    // Signed out (or in as someone else) meanwhile: build() has already
+    // reset the list, and these alerts belong to the previous session.
+    if (!ref.mounted || ref.read(authTokenProvider) != token) return;
+    state = result;
   }
 
   /// Adds the next page. A failure leaves the list as it is; scrolling to
