@@ -36,6 +36,10 @@ class PushNotifications {
   bool _started = false;
   bool _registered = false;
 
+  /// A notice opened before the session was restored (e.g. the one that
+  /// launched the app): marked read once signed in, when it actually opens.
+  String? _unreadOpenedNotice;
+
   PushMessaging get _messaging => _ref.read(pushMessagingProvider);
 
   /// Starts listening. Safe to call more than once.
@@ -50,7 +54,12 @@ class PushNotifications {
     // Only signed-in staff get pushes, so ask for permission then rather
     // than on the login screen.
     _ref.listen(authControllerProvider, (_, auth) {
-      if (auth.value != null) unawaited(_register());
+      if (auth.value == null) return;
+      unawaited(_register());
+      if (_unreadOpenedNotice case final id?) {
+        _unreadOpenedNotice = null;
+        unawaited(_markRead(id));
+      }
     }, fireImmediately: true);
 
     try {
@@ -73,12 +82,29 @@ class PushNotifications {
     }
   }
 
+  /// The user tapped the system notification.
   void _opened(RemoteMessage message) {
-    _refreshData(message);
-    // Tapping a notice is reading it, as tapping it in Alerts would be.
-    if (noticeId(message.data) case final id?) unawaited(_markRead(id));
-    final location = locationForPush(message.data);
+    // A notice reloads Alerts once it is marked read; anything else now.
+    if (noticeId(message.data) == null) _refreshData(message);
+    _view(message, locationForPush(message.data));
+  }
+
+  /// Opens what [message] is about, from the system notification or the
+  /// snackbar's "View". Either way, opening a notice is reading it, as
+  /// tapping it in Alerts would be.
+  void _view(RemoteMessage message, String? location) {
+    if (noticeId(message.data) case final id?) _markReadWhenSignedIn(id);
     if (location != null) open(location);
+  }
+
+  /// Marking read needs the session's token, which isn't restored yet on a
+  /// cold start; until then the notice waits for sign-in.
+  void _markReadWhenSignedIn(String id) {
+    if (_ref.read(authControllerProvider).value != null) {
+      unawaited(_markRead(id));
+    } else {
+      _unreadOpenedNotice = id;
+    }
   }
 
   /// A new request or notice means the cached list it belongs to is stale.
@@ -92,10 +118,12 @@ class PushNotifications {
   Future<void> _markRead(String id) async {
     try {
       await _ref.read(alertsRepositoryProvider).markRead(id);
-      // Reload so the unread dot and badge match the server.
-      _ref.invalidate(alertsControllerProvider);
     } catch (e) {
       debugPrint('Could not mark notification $id read: $e');
+    } finally {
+      // One reload, after the read: it has the new notice and the unread
+      // dot and badge match the server.
+      _ref.invalidate(alertsControllerProvider);
     }
   }
 
@@ -128,7 +156,10 @@ class PushNotifications {
           ),
           action: location == null
               ? null
-              : SnackBarAction(label: 'View', onPressed: () => open(location)),
+              : SnackBarAction(
+                  label: 'View',
+                  onPressed: () => _view(message, location),
+                ),
         ),
       );
   }
