@@ -2,112 +2,107 @@
 
 Taken from the deployed backend's OpenAPI spec (`/openapi/v1.json`, the one Scalar shows) on 2026-11-22. The backend URL is in `env/prod.json` (git-ignored). It is left out of this file because the repo is public.
 
-The spec lists **137 endpoints**. About **30** are useful to the mobile app. The rest are for the web admin, the kiosk or the room stations.
+The spec lists 137 endpoints. About 30 are useful to the mobile app. The rest are for the web admin, the kiosk or the room stations.
 
-## ⚠️ Fix first: the app can't sign in yet
+Good to know:
 
-The app was written for the local backend. The deployed one differs in three ways, which is why login returns 401:
+- Paths start at the root (`/auth/login`, `/loans`). There is no `/api/v1` prefix on the deployed backend. The local backend still uses `/api/v1`, so the local default in `ApiConstants.baseUrl` keeps it.
+- Every endpoint except `/health` and `/auth/login` needs `Authorization: Bearer <token>`.
+- Unknown paths return 401, not 404. A wrong path looks like a wrong password.
 
-| | App calls now | Deployed backend expects |
-|---|---|---|
-| Path prefix | `/api/v1/...` | none, paths start at the root (`/auth/login`, `/loans`, ...) |
-| Login endpoint | `POST /auth/login-mobile` | `POST /auth/login` (there is no `login-mobile`) |
-| Login body | `{identifier, password}` | `{email, password}` |
+## 1. Login fix
 
-- [x] Set `API_BASE_URL` in `env/prod.json` to the bare host, without `/api/v1`
-- [x] Change `ApiConstants.loginPath` to `/auth/login`
-- [x] Send `email` instead of `identifier` in the login body
-- [ ] Confirm the login response puts `accessToken` and `refreshToken` in the body. The spec doesn't describe it. The app now accepts them at the top level or inside `data`, but not as cookies only.
+Login returned 401 because the app was written for the local backend.
 
-Every endpoint except `/health` and `/auth/login` needs `Authorization: Bearer <token>`. Unknown paths also return 401, not 404, so a wrong path looks like a wrong password.
+- [x] Set `API_BASE_URL` in `env/prod.json` to the bare host, without `/api/v1`.
+- [x] Call `POST /auth/login`. There is no `/auth/login-mobile` on the deployed backend.
+- [x] Send `{email, password}` instead of `{identifier, password}`.
+- [ ] Confirm that the login response puts `accessToken` and `refreshToken` in the body. The spec doesn't describe the response. The app reads the tokens from the top level or from inside `data`, but it can't read them from cookies.
 
-## 1. Already used by the app
+## 2. Already used by the app
 
-| Endpoint | Used for | Matches? |
-|---|---|---|
-| `POST /auth/login` `{email, password}` | Sign in | ❌ see the fix above |
-| `GET /approvals/pending` | Pending Approvals list and freeze status | ✅ |
-| `POST /approvals/{sessionId}/approve` `{destinationRoomId, classLengthMinutes}` | Approve with room and class length | ✅ same body |
-| `POST /approvals/{sessionId}/decline` | Decline | ✅ |
-| `GET /approvals/{sessionId}/photo` | Student photo on the approval card | ✅ |
-| `GET /loans?approvedBy=me&status=open&sort=dueAt&pageSize=100` | My Loans | ✅ all params exist; check the values `me` and `open` |
-| `GET /loans/{id}` | Loan detail | ✅ |
-| `GET /loans/{id}/photo` | Checkout photo in loan detail | ✅ |
-| `GET /notifications?page=&pageSize=` | Alerts list | ✅ (`unread=true` also available) |
-| `POST /notifications/{id}/read` | Mark alert as read | ✅ |
+A checked item means the app's path and body match the deployed spec.
 
-## 2. Available now for mobile features not built yet
+- [x] `POST /auth/login` – sign in.
+- [x] `GET /approvals/pending` – Pending Approvals list and freeze status.
+- [x] `POST /approvals/{sessionId}/approve` with `{destinationRoomId, classLengthMinutes}` – approve with a room and class length.
+- [x] `POST /approvals/{sessionId}/decline` – decline.
+- [x] `GET /loans?approvedBy=me&status=open&sort=dueAt&pageSize=100` – My Loans.
+- [x] `GET /loans/{id}` – loan detail.
+- [x] `GET /notifications?page=&pageSize=` – Alerts list. `unread=true` is also available.
+- [x] `POST /notifications/{id}/read` – mark an alert as read.
 
-These match unchecked items in [mobile-phase-plan.md](mobile-phase-plan.md).
+Still to check against the live backend:
+
+- [ ] **Loan filter values.** The parameters `approvedBy` and `status` exist, but the spec doesn't say whether it accepts the values `me` and `open`.
+- [ ] **Photo URLs.** The app doesn't build `/approvals/{sessionId}/photo` or `/loans/{id}/photo` itself. It loads the `photoUrl` that `/approvals/pending` and `/loans/{id}` return. The local backend sends `/api/...` paths. If the deployed one does too, photos get a 401 and the app shows initials instead. If you see `/api/` in a real response, ask the backend team to drop the prefix.
+
+## 3. Ready for features not built yet
+
+These match unchecked items in [mobile-phase-plan.md](mobile-phase-plan.md). Check one off when the app uses it.
 
 ### Auth and session (Phase 1)
 
-| Endpoint | Body | Unblocks |
-|---|---|---|
-| `POST /auth/refresh` | `{refreshToken}` | Renew the 15-min token instead of signing out (NFR-9) |
-| `POST /auth/logout` | `{refreshToken}` (optional) | Cancel the refresh token on sign-out |
-| `POST /auth/change-password` | `{currentPassword, newPassword}` | Change password screen (not in the PRD, nice to have) |
+- [ ] `POST /auth/refresh` with `{refreshToken}` – renew the 15-minute token instead of signing out (NFR-9).
+- [ ] `POST /auth/logout` with an optional `{refreshToken}` – cancel the refresh token on sign-out.
+- [ ] `POST /auth/change-password` with `{currentPassword, newPassword}` – change password screen. Not in the PRD; nice to have.
 
-### Push notifications (Phase 2 blocker – now unblocked)
+### Push notifications (Phase 2)
 
-| Endpoint | Body | Unblocks |
-|---|---|---|
-| `POST /device-tokens` | `{token, platform}` | **Send the phone's push token to the backend (FR-2.1, O3).** The endpoint now exists. |
-| `POST /device-tokens/unregister` | `{token}` | Stop pushes to this phone on sign-out |
+This was the Phase 2 blocker. The endpoints now exist.
+
+- [ ] `POST /device-tokens` with `{token, platform}` – send the phone's push token to the backend (FR-2.1, O3).
+- [ ] `POST /device-tokens/unregister` with `{token}` – stop pushes to this phone on sign-out.
 
 ### Loans and freezes (Phase 3)
 
-| Endpoint | Unblocks |
-|---|---|
-| `GET /loans?approvedBy=me&status=...&page=` | Past loan history with a status filter (FR-2.5). Also supports `q`, `roomId`, `studentId`, `assetId`, `sort`. |
-| `GET /approvals/pending` → `freezes` array | Freeze banner naming the item and student (US-06). The data is already in the response; the app just doesn't read it. |
+- [ ] `GET /loans?approvedBy=me&status=...&page=` – past loan history with a status filter (FR-2.5). It also takes `q`, `roomId`, `studentId`, `assetId` and `sort`.
+- [ ] Read the `freezes` array from `GET /approvals/pending` – a freeze banner that names the item and the student (US-06). The response already has this data; the app just doesn't read it yet.
 
 ### Offline QR audit (Phase 4)
 
-| Endpoint | Body / params | Step |
-|---|---|---|
-| `GET /rooms?page=&pageSize=&q=` | | Audit room list |
-| `GET /rooms/{id}/roster` | | Download the room roster for offline use (FR-7.3) |
-| `GET /audits?roomId=&status=` | | Resume an unfinished audit |
-| `POST /audits` | `{roomId}` | Start an audit |
-| `GET /audits/{id}` | | Audit results after sync |
-| `POST /audits/{id}/scans:batch` | `{scans: [{clientScanId, scannedValue, scannedAt}]}` | Sync offline scans. `clientScanId` prevents duplicates (FR-7.4, NFR-8). `scannedValue` is the raw QR text. |
-| `POST /audits/{id}/complete` | | Finish; unscanned roster items become missing (FR-7.5) |
-| `POST /audits/{id}/sign-off` | | Custodian sign-off |
-| `GET /audits/{id}/report?format=pdf` | `format=pdf` or `csv` | Open or share the report (US-14) |
-| `GET /assets/{id}` | | Show what a scanned QR is (name, home room) |
+In the order the audit flow uses them:
+
+- [ ] `GET /rooms?page=&pageSize=&q=` – list the rooms to audit.
+- [ ] `GET /rooms/{id}/roster` – download the room's roster for offline use (FR-7.3).
+- [ ] `GET /audits?roomId=&status=` – resume an unfinished audit.
+- [ ] `POST /audits` with `{roomId}` – start an audit.
+- [ ] `POST /audits/{id}/scans:batch` with `{scans: [{clientScanId, scannedValue, scannedAt}]}` – sync offline scans. `clientScanId` prevents duplicates (FR-7.4, NFR-8). `scannedValue` is the raw QR text.
+- [ ] `GET /assets/{id}` – show what a scanned QR is (name, home room).
+- [ ] `POST /audits/{id}/complete` – finish the audit. Roster items that weren't scanned become missing (FR-7.5).
+- [ ] `POST /audits/{id}/sign-off` – custodian sign-off.
+- [ ] `GET /audits/{id}` – audit results after the sync.
+- [ ] `GET /audits/{id}/report?format=pdf` – open or share the report as `pdf` or `csv` (US-14).
 
 ### Staff on mobile (optional)
 
-| Endpoint | Use |
-|---|---|
-| `GET /anomalies?status=open&roomId=&loanId=` | Open anomalies list |
-| `POST /anomalies/{id}/acknowledge` / `resolve` | Acknowledge or resolve with a note (FR-4.5) |
-| `GET /stations/health` | Station Online / Offline view (FR-8.2) |
-| `GET /dashboard/summary` | Summary numbers on a staff home screen |
-| `GET /students/{id}/standing` | A student's warnings, marks and holds (read only) |
+- [ ] `GET /anomalies?status=open&roomId=&loanId=` – list open anomalies.
+- [ ] `POST /anomalies/{id}/acknowledge` and `POST /anomalies/{id}/resolve` – acknowledge an anomaly, or resolve it with a note (FR-4.5).
+- [ ] `GET /stations/health` – show whether each station is online or offline (FR-8.2).
+- [ ] `GET /dashboard/summary` – summary numbers for a staff home screen.
+- [ ] `GET /students/{id}/standing` – a student's warnings, marks and holds (read only).
 
-## 3. Not for mobile
+## 4. Ask the backend team
 
-| Group | Endpoints | Used by |
-|---|---|---|
-| Kiosk checkout | `/kiosk/{stationCode}/session(s)`, `/kiosk/sessions/{id}/fingerprint`, `/asset`, `/photo`, `/confirm`, `/cancel` | Counter kiosk |
-| Kiosk enrollment | `/kiosk/enrollment/sessions/{id}/...` | Counter kiosk |
-| Room stations | `POST /stations/{code}/scans`, `POST /stations/{code}/heartbeat` | ESP32 room stations |
-| People admin | `/users/...`, `/students/...`, `/students:import`, `/sections/...`, `/enrollment/...`, `/students/{id}/fingerprints/...` | Web admin |
-| Inventory admin | `POST/PUT/DELETE /assets...`, `/assets/{id}/image`, `/assets/{id}/restore`, `/assets/{id}/damage-liability`, `/asset-categories/...`, `/assets/qr-sheet`, `GET /assets/{id}/qr` | Web admin |
-| Rooms and stations admin | `POST/PUT/DELETE /rooms...`, `POST /rooms/{id}/roster`, `/stations/...` (CRUD, `rotate-key`) | Web admin |
-| Cards | `/auth-cards/...` | Web admin |
-| Loan actions | `POST /loans/{id}/mark-missing`, `/return`, `/void`, `PUT /loans/{id}/room`, `PUT /loans/{id}/borrower` | Web admin (staff) |
-| Violations | `/violations`, `/warnings/...`, `/marks/...`, `/holds/...`, `/freezes/{id}/lift`, `/liabilities/{id}/settle` | Web admin (staff) |
-| Events | `/events/...` | Web admin |
-| Audit admin | `GET /rooms/{id}/checklist:export`, `POST /audits/import` | Web admin |
-| System | `/settings/...`, `/data-retention/...`, `/audit-log`, `/borrowers/check`, `/rooms/{id}/occupancy`, `/assets/{id}/history`, `/health` | Web admin, monitoring |
+The spec doesn't cover these.
 
-## 4. Not in the spec – ask the backend team
+- [ ] **Response shapes.** The spec documents no 200 responses. Get a sample of the login, `/loans` and `/audits/{id}` responses, or ask the team to add response types.
+- [ ] **Roles.** The spec doesn't say which role can call which endpoint. Confirm that instructors can use approvals, loans and notifications, and that custodians can use audits.
+- [ ] **SignalR hub.** WebSocket hubs don't appear in OpenAPI. Confirm whether a hub exists and what its path is. If there isn't one, use push plus polling.
+- [ ] **`platform` values** for `POST /device-tokens`, for example `android` and `ios`.
+- [ ] **QR content.** Does a QR label hold only the asset UUID? If so, the app can match it against the roster offline.
 
-- [ ] **Response shapes.** Every 200 response is undocumented in the spec. Get a sample of the login, `/loans` and `/audits/{id}` responses, or ask the backend team to add response types.
-- [ ] **Roles.** The spec doesn't say which role can call what. Confirm instructors can use approvals, loans and notifications, and custodians can use audits.
-- [ ] **SignalR hub.** WebSocket hubs don't show up in OpenAPI. Confirm whether a hub exists and its path, or settle on pushes plus polling.
-- [ ] **`platform` values** for `POST /device-tokens` (for example `android` / `ios`).
-- [ ] **QR content.** Does a QR label hold just the asset UUID, so the app can match it against the roster offline?
+## 5. Not for mobile
+
+The mobile app doesn't call these. They're listed so nobody wires them up by mistake.
+
+- **Counter kiosk:** checkout (`/kiosk/{stationCode}/session(s)`, `/kiosk/sessions/{id}/...`) and enrollment (`/kiosk/enrollment/sessions/{id}/...`).
+- **ESP32 room stations:** `POST /stations/{code}/scans` and `POST /stations/{code}/heartbeat`.
+- **Web admin, people:** `/users`, `/students`, `/students:import`, `/sections`, `/enrollment`, `/students/{id}/fingerprints`.
+- **Web admin, inventory:** asset create, edit and delete, `/assets/{id}/image`, `/restore`, `/damage-liability`, `/asset-categories`, `/assets/qr-sheet`, `GET /assets/{id}/qr`.
+- **Web admin, rooms and stations:** room create, edit and delete, `POST /rooms/{id}/roster`, station CRUD and `rotate-key`.
+- **Web admin, cards:** `/auth-cards`.
+- **Web admin, staff loan actions:** `POST /loans/{id}/mark-missing`, `/return`, `/void`, `PUT /loans/{id}/room`, `PUT /loans/{id}/borrower`.
+- **Web admin, violations:** `/violations`, `/warnings`, `/marks`, `/holds`, `/freezes/{id}/lift`, `/liabilities/{id}/settle`.
+- **Web admin, other:** `/events`, `GET /rooms/{id}/checklist:export`, `POST /audits/import`.
+- **System and monitoring:** `/settings`, `/data-retention`, `/audit-log`, `/borrowers/check`, `/rooms/{id}/occupancy`, `/assets/{id}/history`, `/health`.
