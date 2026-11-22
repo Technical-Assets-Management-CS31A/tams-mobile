@@ -65,6 +65,9 @@ class _FakeLoans implements LoansRepository {
   Object? error;
 
   @override
+  Future<LoansPage> myOpenLoans() async => LoansPage.empty;
+
+  @override
   Future<LoanDetail> detail(String id) async {
     if (error case final e?) throw e;
     return result!;
