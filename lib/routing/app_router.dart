@@ -88,7 +88,18 @@ StatefulShellRoute shellRoute({GlobalKey<NavigatorState>? rootNavigatorKey}) =>
           _fade(state, AppShell(navigationShell: navigationShell)),
       branches: [
         _tab('/approvals', const ApprovalsScreen()),
-        _tab('/loans', const MyLoansScreen()),
+        _tab(
+          '/loans',
+          const MyLoansScreen(),
+          routes: [
+            GoRoute(
+              path: ':loanId',
+              parentNavigatorKey: rootNavigatorKey,
+              builder: (_, state) =>
+                  LoanDetailScreen(loanId: state.pathParameters['loanId']!),
+            ),
+          ],
+        ),
         _tab(
           '/alerts',
           const AlertsScreen(),
