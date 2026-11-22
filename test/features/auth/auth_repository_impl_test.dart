@@ -30,11 +30,32 @@ void main() {
       expect(user.email, 'a@b.com');
       expect(user.token, 'jwt-1');
       expect(user.refreshToken, 'rt-1');
-      expect(adapter.lastRequest!.path, '/auth/login-mobile');
-      expect(adapter.lastRequest!.data, {
-        'identifier': 'a@b.com',
-        'password': 'pw',
-      });
+      expect(adapter.lastRequest!.path, '/auth/login');
+      expect(adapter.lastRequest!.data, {'email': 'a@b.com', 'password': 'pw'});
+    });
+
+    test('reads tokens at the top level of the response', () async {
+      final adapter = FakeHttpAdapter(
+        body: {
+          'accessToken': 'jwt-2',
+          'refreshToken': 'rt-2',
+          'user': {'email': 'x@tams.com'},
+        },
+      );
+      final user = await repoWith(adapter).login('x@tams.com', 'pw');
+
+      expect(user.token, 'jwt-2');
+      expect(user.refreshToken, 'rt-2');
+      expect(user.email, 'x@tams.com');
+    });
+
+    test('accepts "token" and uses the typed email without a user', () async {
+      final adapter = FakeHttpAdapter(body: {'token': 'jwt-3'});
+      final user = await repoWith(adapter).login('typed@tams.com', 'pw');
+
+      expect(user.token, 'jwt-3');
+      expect(user.refreshToken, isNull);
+      expect(user.email, 'typed@tams.com');
     });
 
     test('falls back to the username when the email is empty', () async {
@@ -98,6 +119,25 @@ void main() {
           FakeHttpAdapter(statusCode: 400, body: errorResponse('Bad input.')),
         ),
         'Bad input.',
+      );
+    });
+
+    test('HTTP 400 validation problem shows the first field error', () async {
+      expect(
+        await failureMessage(
+          FakeHttpAdapter(
+            statusCode: 400,
+            body: {
+              'title': 'One or more validation errors occurred.',
+              'status': 400,
+              'errors': {
+                'email': ['Email is required.'],
+              },
+              'code': 'VALIDATION_FAILED',
+            },
+          ),
+        ),
+        'Email is required.',
       );
     });
 

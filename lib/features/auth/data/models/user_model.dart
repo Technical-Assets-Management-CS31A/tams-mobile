@@ -7,33 +7,45 @@ class UserModel extends User {
     super.refreshToken,
   });
 
-  /// Parses the body of `POST /auth/login-mobile`:
-  /// `{success, message, data: {user: {email, username, ...}, accessToken, refreshToken}}`
+  /// Parses the body of `POST /auth/login`. The tokens can sit at the top
+  /// level (`{accessToken, refreshToken, user}`) or inside an ApiResponse
+  /// wrapper (`{success, message, data: {accessToken, refreshToken, user}}`).
+  /// The access token may also be called `token`.
   ///
-  /// Throws [FormatException] if the body doesn't have that shape.
-  factory UserModel.fromLoginResponse(Object? body) {
-    final data = body is Map ? body['data'] : null;
-    if (data is! Map) {
-      throw const FormatException('Login response has no "data" object.');
+  /// The email comes from `user.email`, then `user.username`, then
+  /// [fallbackEmail] (what the user typed).
+  ///
+  /// Throws [FormatException] if there is no access token.
+  factory UserModel.fromLoginResponse(
+    Object? body, {
+    String fallbackEmail = '',
+  }) {
+    if (body is! Map) {
+      throw const FormatException('Login response is not an object.');
     }
+    final wrapped = body['data'];
+    final data = wrapped is Map ? wrapped : body;
 
-    final token = data['accessToken'];
-    if (token is! String || token.isEmpty) {
+    final token = _string(data['accessToken']) ?? _string(data['token']);
+    if (token == null) {
       throw const FormatException('Login response has no access token.');
     }
 
-    final refreshToken = data['refreshToken'];
     final user = data['user'];
-    // Email can be "" on the backend; fall back to the username.
-    final email = user is Map ? user['email'] : null;
-    final username = user is Map ? user['username'] : null;
+    final email =
+        (user is Map
+            ? _string(user['email']) ?? _string(user['username'])
+            : null) ??
+        _string(data['email']) ??
+        fallbackEmail;
 
     return UserModel(
-      email: email is String && email.isNotEmpty
-          ? email
-          : (username is String ? username : ''),
+      email: email,
       token: token,
-      refreshToken: refreshToken is String ? refreshToken : null,
+      refreshToken: _string(data['refreshToken']),
     );
   }
+
+  static String? _string(Object? value) =>
+      value is String && value.isNotEmpty ? value : null;
 }
