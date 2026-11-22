@@ -9,6 +9,7 @@ import '../../../../routing/pending_location.dart';
 import '../../../alerts/presentation/controllers/alerts_controller.dart';
 import '../../../approvals/presentation/controllers/approvals_controller.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
+import '../../../loans/presentation/controllers/loan_detail_provider.dart';
 import '../../../splash/presentation/controllers/app_ready_provider.dart';
 import '../../data/push_messaging.dart';
 import '../../domain/push_destination.dart';
@@ -113,6 +114,8 @@ class PushNotifications {
       _ref.invalidate(approvalsControllerProvider);
     }
     if (isAlertPush(message.data)) _ref.invalidate(alertsControllerProvider);
+    // Overdue, anomaly and new-loan pushes change a loan's live status.
+    if (isLoanPush(message.data)) _ref.invalidate(myLoansProvider);
   }
 
   Future<void> _markRead(String id) async {
