@@ -14,6 +14,10 @@ endif
 
 # Optional backend URL for run targets, e.g. make run API_BASE_URL=http://192.168.1.10:5289/api/v1
 API_BASE_URL ?=
+
+# Local, git-ignored settings for the deployed backend (copy env/prod.example.json).
+# Keeps the real URL out of this public repo.
+PROD_ENV ?= env/prod.json
 DEFINES := $(if $(API_BASE_URL),--dart-define=API_BASE_URL=$(API_BASE_URL))
 
 # Optional device id for run targets (see `make devices`), e.g. make run DEVICE=emulator-5554
@@ -22,7 +26,7 @@ DEVICE_FLAG := $(if $(DEVICE),-d $(DEVICE))
 
 .DEFAULT_GOAL := help
 .PHONY: help get upgrade outdated format format-check lint fix test coverage \
-        check ci run run-release devices build-apk build-appbundle clean \
+        check ci run run-prod run-release devices build-apk build-appbundle build-apk-prod prod-env clean \
         audit secrets workflow-lint
 
 help: ## List available targets
@@ -73,6 +77,9 @@ devices: ## List connected devices and emulators
 run: ## Run in debug mode (optional: API_BASE_URL=..., DEVICE=...)
 	$(FLUTTER) run $(DEVICE_FLAG) $(DEFINES)
 
+run-prod: prod-env ## Run in debug mode against the deployed backend from env/prod.json (optional: DEVICE=...)
+	$(FLUTTER) run $(DEVICE_FLAG) --dart-define-from-file=$(PROD_ENV)
+
 run-release: ## Run in release mode (optional: API_BASE_URL=..., DEVICE=...)
 	$(FLUTTER) run --release $(DEVICE_FLAG) $(DEFINES)
 
@@ -83,6 +90,12 @@ build-apk: ## Build release APK (build/app/outputs/flutter-apk/app-release.apk)
 
 build-appbundle: ## Build release Android App Bundle
 	$(FLUTTER) build appbundle --release $(DEFINES)
+
+build-apk-prod: prod-env ## Build release APK for the deployed backend from env/prod.json
+	$(FLUTTER) build apk --release --dart-define-from-file=$(PROD_ENV)
+
+prod-env:
+	@test -f $(PROD_ENV) || { echo "Missing $(PROD_ENV): copy env/prod.example.json and set API_BASE_URL"; exit 1; }
 
 clean: ## Delete build outputs and re-fetch dependencies
 	$(FLUTTER) clean
