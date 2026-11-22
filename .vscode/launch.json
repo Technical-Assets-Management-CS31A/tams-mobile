@@ -1,0 +1,19 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "TAMS (local backend)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart"
+    },
+    {
+      // Needs env/prod.json (git-ignored); copy env/prod.example.json.
+      "name": "TAMS (deployed backend)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "toolArgs": ["--dart-define-from-file=env/prod.json"]
+    }
+  ]
+}
