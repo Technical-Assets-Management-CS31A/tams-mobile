@@ -55,6 +55,15 @@ String? pushType(Map<String, dynamic> data) {
 bool isAlertPush(Map<String, dynamic> data) =>
     pushDestinations[pushType(data)] == '/alerts';
 
+/// True for pushes that can change a loan's live status in My Loans: new
+/// loans, and every warning, anomaly and overdue notice.
+bool isLoanPush(Map<String, dynamic> data) {
+  final type = pushType(data);
+  return type != null &&
+      !type.startsWith('instructor.') &&
+      (pushDestinations[type] == '/loans' || isAlertPush(data));
+}
+
 /// The stored notification a notice push is for, so it can be marked read.
 String? noticeId(Map<String, dynamic> data) {
   final id = data['notificationId'];
