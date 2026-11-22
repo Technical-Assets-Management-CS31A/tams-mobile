@@ -5,10 +5,12 @@ import 'package:go_router/go_router.dart';
 import 'package:tams_mobile/core/network/token_provider.dart';
 import 'package:tams_mobile/features/alerts/presentation/controllers/alerts_controller.dart';
 import 'package:tams_mobile/features/approvals/presentation/controllers/approvals_controller.dart';
+import 'package:tams_mobile/features/loans/presentation/controllers/loan_detail_provider.dart';
 import 'package:tams_mobile/routing/app_router.dart';
 
 import '../../helpers/fake_alerts_repository.dart';
 import '../../helpers/fake_approvals_repository.dart';
+import '../../helpers/fake_loans_repository.dart';
 
 Future<GoRouter> _pumpShell(
   WidgetTester tester, {
@@ -29,6 +31,7 @@ Future<GoRouter> _pumpShell(
         alertsRepositoryProvider.overrideWithValue(
           alerts ?? FakeAlertsRepository(),
         ),
+        loansRepositoryProvider.overrideWithValue(FakeLoansRepository()),
         authTokenProvider.overrideWith(SignedInToken.new),
       ],
       child: MaterialApp.router(routerConfig: router),
