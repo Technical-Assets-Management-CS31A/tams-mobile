@@ -19,7 +19,6 @@ class ApiConstants {
     return 'http://$host:$_devPort/api/v1';
   }
 
-  /// Returns the JWT and refresh token in the body (the web `/auth/login`
-  /// sets cookies instead).
-  static const loginPath = '/auth/login-mobile';
+  /// Takes `{email, password}`; returns the access and refresh tokens.
+  static const loginPath = '/auth/login';
 }

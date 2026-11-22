@@ -30,7 +30,7 @@ class AuthRepositoryImpl implements AuthRepository {
       }
       throw Failure.fromDio(e);
     } on FormatException {
-      // 2xx, but not the login-mobile shape (wrong URL or backend changed).
+      // 2xx, but no access token in the body (wrong URL or backend changed).
       throw const Failure('Unexpected response from the server.');
     }
   }

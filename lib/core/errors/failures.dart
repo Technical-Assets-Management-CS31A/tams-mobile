@@ -49,14 +49,29 @@ class Failure implements Exception {
   }
 
   /// The human-readable message of an error body, if any: `detail` of an
-  /// RFC 7807 problem (PRD 6.3), or `message` of the older ApiResponse body.
-  /// The backend's error handler writes PascalCase (`Message`), while normal
-  /// responses are camelCase, so check both.
+  /// RFC 7807 problem (PRD 6.3), the first entry of its validation `errors`
+  /// (e.g. `{"email": ["Email is required."]}`), or `message` of the older
+  /// ApiResponse body. The old backend's error handler writes PascalCase
+  /// (`Message`), while normal responses are camelCase, so check both.
   static String? serverMessage(DioException e) {
     final data = e.response?.data;
     if (data is! Map) return null;
-    final message = data['detail'] ?? data['message'] ?? data['Message'];
+    final message =
+        data['detail'] ??
+        _firstValidationError(data['errors']) ??
+        data['message'] ??
+        data['Message'];
     return message is String && message.trim().isNotEmpty ? message : null;
+  }
+
+  static String? _firstValidationError(Object? errors) {
+    if (errors is! Map) return null;
+    for (final messages in errors.values) {
+      if (messages is List && messages.isNotEmpty && messages.first is String) {
+        return messages.first as String;
+      }
+    }
+    return null;
   }
 
   /// The stable machine-readable `code` of a problem body (for example

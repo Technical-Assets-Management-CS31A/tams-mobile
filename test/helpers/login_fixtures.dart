@@ -1,7 +1,7 @@
 import 'dart:convert';
 
-/// A successful `POST /auth/login-mobile` body, shaped like the backend's
-/// `ApiResponse<MobileLoginResponseDto>`.
+/// A successful `POST /auth/login` body wrapped in an ApiResponse
+/// (`{success, message, data: {user, accessToken, refreshToken}}`).
 Map<String, Object?> loginResponse({
   String email = 'a@b.com',
   String username = 'juan',
