@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../alerts/presentation/controllers/alerts_controller.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
+import '../../../loans/presentation/controllers/loan_detail_provider.dart';
 
 /// One bottom-navigation tab. Order matches the shell route's branches.
 class ShellTab {
@@ -48,7 +49,11 @@ class _AppShellState extends ConsumerState<AppShell> {
     // aren't counted yet. Reloading here, not in AlertsScreen, keeps the
     // badge current even when the Alerts tab was never opened.
     _lifecycle = AppLifecycleListener(
-      onResume: () => ref.read(alertsControllerProvider.notifier).refresh(),
+      onResume: () {
+        ref.read(alertsControllerProvider.notifier).refresh();
+        // Statuses and countdowns moved on while the app was away.
+        ref.invalidate(myLoansProvider);
+      },
     );
   }
 
