@@ -33,3 +33,16 @@ String formatAge(DateTime at, {required DateTime now}) {
   }
   return formatDateTime(local, now: now);
 }
+
+/// A countdown: "1 h 05 min" an hour or more out, "4:07" (minutes and
+/// seconds) under that. Negative durations count up the same way, so the
+/// caller words it ("Overdue by ...").
+String formatCountdown(Duration left) {
+  final d = left.abs();
+  if (d >= const Duration(hours: 1)) {
+    final minutes = (d.inMinutes % 60).toString().padLeft(2, '0');
+    return '${d.inHours} h $minutes min';
+  }
+  final seconds = (d.inSeconds % 60).toString().padLeft(2, '0');
+  return '${d.inMinutes}:$seconds';
+}
