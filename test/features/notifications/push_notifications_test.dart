@@ -90,6 +90,10 @@ RemoteMessage _push(String type, {String? title = 'Title', String? body}) =>
 /// Loan details fail at once, so the screen settles without the network.
 class _NoLoans implements LoansRepository {
   @override
+  Future<LoansPage> myOpenLoans() async =>
+      throw const Failure('Offline in tests.');
+
+  @override
   Future<LoanDetail> detail(String id) async =>
       throw const Failure('Offline in tests.');
 }
