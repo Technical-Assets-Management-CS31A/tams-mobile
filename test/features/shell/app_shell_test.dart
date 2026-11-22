@@ -5,16 +5,32 @@ import 'package:go_router/go_router.dart';
 import 'package:tams_mobile/core/network/token_provider.dart';
 import 'package:tams_mobile/features/alerts/presentation/controllers/alerts_controller.dart';
 import 'package:tams_mobile/features/approvals/presentation/controllers/approvals_controller.dart';
+import 'package:tams_mobile/features/auth/domain/entities/user.dart';
+import 'package:tams_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:tams_mobile/features/loans/presentation/controllers/loan_detail_provider.dart';
+import 'package:tams_mobile/features/shell/presentation/widgets/shell_header.dart';
 import 'package:tams_mobile/routing/app_router.dart';
 
 import '../../helpers/fake_alerts_repository.dart';
 import '../../helpers/fake_approvals_repository.dart';
 import '../../helpers/fake_loans_repository.dart';
 
+/// Signed in as a known user; records sign-outs instead of touching storage.
+class _FakeAuth extends AuthController {
+  int logouts = 0;
+
+  @override
+  Future<User?> build() async =>
+      const User(email: 'teacher@school.edu', token: 'test-token');
+
+  @override
+  Future<void> logout() async => logouts++;
+}
+
 Future<GoRouter> _pumpShell(
   WidgetTester tester, {
   FakeAlertsRepository? alerts,
+  _FakeAuth? auth,
 }) async {
   final router = GoRouter(
     initialLocation: homeLocation,
@@ -33,6 +49,7 @@ Future<GoRouter> _pumpShell(
         ),
         loansRepositoryProvider.overrideWithValue(FakeLoansRepository()),
         authTokenProvider.overrideWith(SignedInToken.new),
+        if (auth != null) authControllerProvider.overrideWith(() => auth),
       ],
       child: MaterialApp.router(routerConfig: router),
     ),
@@ -64,6 +81,21 @@ void main() {
     expect(badge, findsOneWidget);
     expect(
       find.descendant(of: badge, matching: find.text('2')),
+      findsOneWidget,
+    );
+
+    await tester.tap(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Alerts'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: find.byType(ShellHeader),
+        matching: find.text('2 unread'),
+      ),
       findsOneWidget,
     );
   });
@@ -119,11 +151,65 @@ void main() {
         reason: label,
       );
       expect(
-        find.descendant(of: find.byType(AppBar), matching: find.text(label)),
+        find.descendant(
+          of: find.byType(ShellHeader),
+          matching: find.text(label),
+        ),
         findsOneWidget,
         reason: label,
       );
       expect(find.text(emptyTitle), findsOneWidget, reason: label);
     }
+  });
+
+  group('sign out', () {
+    Future<_FakeAuth> openSheet(WidgetTester tester) async {
+      final auth = _FakeAuth();
+      await _pumpShell(tester, auth: auth);
+      // In the app the router's redirect has already loaded the user.
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(NavigationBar)),
+      );
+      await container.read(authControllerProvider.future);
+      await tester.tap(find.byTooltip('Sign out'));
+      await tester.pumpAndSettle();
+      return auth;
+    }
+
+    testWidgets('asks first instead of signing out on tap', (tester) async {
+      final auth = await openSheet(tester);
+
+      expect(find.text('Sign out?'), findsOneWidget);
+      expect(find.textContaining('teacher@school.edu'), findsOneWidget);
+      expect(auth.logouts, 0);
+    });
+
+    testWidgets('Cancel keeps the user signed in', (tester) async {
+      final auth = await openSheet(tester);
+      await tester.tap(find.byKey(const Key('sign-out-cancel')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sign out?'), findsNothing);
+      expect(auth.logouts, 0);
+    });
+
+    testWidgets('dismissing the sheet keeps the user signed in', (
+      tester,
+    ) async {
+      final auth = await openSheet(tester);
+      await tester.tapAt(const Offset(20, 20)); // the scrim
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sign out?'), findsNothing);
+      expect(auth.logouts, 0);
+    });
+
+    testWidgets('confirming signs out', (tester) async {
+      final auth = await openSheet(tester);
+      await tester.tap(find.byKey(const Key('sign-out-confirm')));
+      await tester.pumpAndSettle();
+
+      expect(auth.logouts, 1);
+    });
   });
 }

@@ -1,34 +1,56 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../alerts/presentation/controllers/alerts_controller.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../../loans/presentation/controllers/loan_detail_provider.dart';
+import '../widgets/shell_header.dart';
+import '../widgets/sign_out_sheet.dart';
 
 /// One bottom-navigation tab. Order matches the shell route's branches.
 class ShellTab {
-  const ShellTab(this.label, this.icon, this.selectedIcon);
+  const ShellTab(this.label, this.subtitle, this.icon, this.selectedIcon);
 
   final String label;
+
+  /// Shown under the title in the header.
+  final String subtitle;
   final IconData icon;
   final IconData selectedIcon;
 }
 
 const alertsTab = ShellTab(
   'Alerts',
+  'Late, overdue and missing equipment',
   Icons.notifications_none_outlined,
   Icons.notifications,
 );
 
 const shellTabs = [
-  ShellTab('Approvals', Icons.fact_check_outlined, Icons.fact_check),
-  ShellTab('My Loans', Icons.inventory_2_outlined, Icons.inventory_2),
+  ShellTab(
+    'Approvals',
+    'Borrow requests waiting on you',
+    Icons.fact_check_outlined,
+    Icons.fact_check,
+  ),
+  ShellTab(
+    'My Loans',
+    "Equipment you've borrowed",
+    Icons.inventory_2_outlined,
+    Icons.inventory_2,
+  ),
   alertsTab,
-  ShellTab('Audit', Icons.history, Icons.history),
+  ShellTab(
+    'Audit',
+    'Check-outs, returns and approvals',
+    Icons.history,
+    Icons.history,
+  ),
 ];
 
-/// Signed-in frame: app bar, the current tab, and the bottom navigation bar.
+/// Signed-in frame: header, the current tab, and the bottom navigation bar.
 /// Each tab keeps its own navigation stack and scroll position.
 class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key, required this.navigationShell});
@@ -72,34 +94,56 @@ class _AppShellState extends ConsumerState<AppShell> {
       alertsControllerProvider.select((s) => s.value?.unreadCount ?? 0),
     );
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(shellTabs[index].label),
-        actions: [
-          IconButton(
-            tooltip: 'Sign out',
-            icon: const Icon(Icons.logout),
-            // Router redirect sends us back to /login once state is null.
-            onPressed: () => ref.read(authControllerProvider.notifier).logout(),
-          ),
-        ],
-      ),
-      body: navigationShell,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: index,
-        // Tapping the current tab again returns it to its first screen.
-        onDestinationSelected: (i) =>
-            navigationShell.goBranch(i, initialLocation: i == index),
-        destinations: [
-          for (final tab in shellTabs)
-            NavigationDestination(
-              icon: _badged(tab, tab.icon, unread),
-              selectedIcon: _badged(tab, tab.selectedIcon, unread),
-              label: tab.label,
+    final tab = shellTabs[index];
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      // Dark status bar icons on the white header.
+      value: SystemUiOverlayStyle.dark,
+      child: Scaffold(
+        body: Column(
+          children: [
+            ShellHeader(
+              title: tab.label,
+              subtitle: tab.subtitle,
+              badge: tab == alertsTab && unread > 0
+                  ? '${unread > 99 ? '99+' : unread} unread'
+                  : null,
+              onSignOut: _confirmSignOut,
             ),
-        ],
+            Expanded(
+              // The header already sits below the status bar.
+              child: MediaQuery.removePadding(
+                context: context,
+                removeTop: true,
+                child: navigationShell,
+              ),
+            ),
+          ],
+        ),
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: index,
+          // Tapping the current tab again returns it to its first screen.
+          onDestinationSelected: (i) =>
+              navigationShell.goBranch(i, initialLocation: i == index),
+          destinations: [
+            for (final tab in shellTabs)
+              NavigationDestination(
+                icon: _badged(tab, tab.icon, unread),
+                selectedIcon: _badged(tab, tab.selectedIcon, unread),
+                label: tab.label,
+              ),
+          ],
+        ),
       ),
     );
+  }
+
+  Future<void> _confirmSignOut() async {
+    final email = ref.read(authControllerProvider).value?.email;
+    final confirmed = await showSignOutSheet(context, email: email);
+    if (!confirmed || !mounted) return;
+    // Router redirect sends us back to /login once state is null.
+    await ref.read(authControllerProvider.notifier).logout();
   }
 
   /// The Alerts icon carries the unread count.

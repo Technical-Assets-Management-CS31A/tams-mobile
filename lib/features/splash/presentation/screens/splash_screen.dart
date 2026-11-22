@@ -2,12 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-class _C {
-  static const primary = Color(0xFF2F5BEA);
-  static const ink = Color(0xFF0B0F19);
-  static const faint = Color(0xFF9CA3AF);
-  static const line = Color(0xFFE5E7EB);
-}
+import '../../../../core/theme/brand.dart';
+import '../../../../core/widgets/brand_logo.dart';
 
 /// Shown at launch while the saved session is checked. The router moves on
 /// to /login or the tabs by itself once the app is ready.
@@ -81,25 +77,7 @@ class _SplashScreenState extends State<SplashScreen>
                     opacity: _logoFade,
                     child: ScaleTransition(
                       scale: Tween(begin: 0.8, end: 1.0).animate(_logo),
-                      child: Container(
-                        width: 96,
-                        height: 96,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: _C.line),
-                        ),
-                        child: ClipOval(
-                          child: Image.asset(
-                            'images/aclc_logo.jpeg',
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) => const Icon(
-                              Icons.school,
-                              color: _C.primary,
-                              size: 44,
-                            ),
-                          ),
-                        ),
-                      ),
+                      child: const BrandLogo(size: 96),
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -116,7 +94,7 @@ class _SplashScreenState extends State<SplashScreen>
                           fontSize: 30,
                           fontWeight: FontWeight.w700,
                           letterSpacing: -0.8,
-                          color: _C.ink,
+                          color: BrandColors.ink,
                         ),
                       ),
                     ),
@@ -139,7 +117,7 @@ class _SplashScreenState extends State<SplashScreen>
                           height: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2.2,
-                            color: _C.primary,
+                            color: BrandColors.primary,
                           ),
                         ),
                         const SizedBox(height: 24),
@@ -147,7 +125,7 @@ class _SplashScreenState extends State<SplashScreen>
                           'ACLC College of Mandaue',
                           style: GoogleFonts.inter(
                             fontSize: 12,
-                            color: _C.faint,
+                            color: BrandColors.faint,
                           ),
                         ),
                       ],

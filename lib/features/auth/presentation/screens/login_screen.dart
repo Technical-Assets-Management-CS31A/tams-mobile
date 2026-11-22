@@ -1,29 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../../../core/errors/failures.dart';
+import '../../../../core/theme/brand.dart';
+import '../../../../core/widgets/brand_logo.dart';
+import '../../../../core/widgets/reveal.dart';
 import '../controllers/auth_controller.dart';
-
-class _C {
-  static const primary = Color(0xFF2F5BEA);
-  static const ink = Color(0xFF0B0F19);
-  static const muted = Color(0xFF6B7280);
-  static const faint = Color(0xFF9CA3AF);
-  static const field = Color(0xFFF3F4F6);
-  static const line = Color(0xFFE5E7EB);
-  static const error = Color(0xFFDC2626);
-  static const errorBg = Color(0xFFFEF2F2);
-}
-
-TextStyle _text(double size, {FontWeight? weight, Color? color, double? ls}) =>
-    GoogleFonts.inter(
-      fontSize: size,
-      fontWeight: weight,
-      color: color ?? _C.ink,
-      letterSpacing: ls,
-    );
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -102,14 +85,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           const SizedBox(height: 24),
-                          _Reveal(
+                          Reveal(
                             parent: _intro,
                             start: 0,
                             child: const _Brand(),
                           ),
                           const SizedBox(height: 32),
                           const Spacer(),
-                          _Reveal(
+                          Reveal(
                             parent: _intro,
                             start: 0.1,
                             child: Column(
@@ -117,7 +100,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                               children: [
                                 Text(
                                   'Sign in',
-                                  style: _text(
+                                  style: brandText(
                                     32,
                                     weight: FontWeight.w700,
                                     ls: -1,
@@ -127,16 +110,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                 Text(
                                   'Use your school account to borrow and '
                                   'track equipment.',
-                                  style: _text(
+                                  style: brandText(
                                     15,
-                                    color: _C.muted,
+                                    color: BrandColors.muted,
                                   ).copyWith(height: 1.45),
                                 ),
                               ],
                             ),
                           ),
                           const SizedBox(height: 32),
-                          _Reveal(
+                          Reveal(
                             parent: _intro,
                             start: 0.2,
                             child: _Field(
@@ -152,7 +135,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                             ),
                           ),
                           const SizedBox(height: 12),
-                          _Reveal(
+                          Reveal(
                             parent: _intro,
                             start: 0.28,
                             child: _Field(
@@ -189,7 +172,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                                         : Icons.visibility_outlined,
                                     key: ValueKey(_obscurePassword),
                                     size: 20,
-                                    color: _C.faint,
+                                    color: BrandColors.faint,
                                   ),
                                 ),
                               ),
@@ -197,7 +180,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                           ),
                           _ErrorBanner(message: error),
                           const SizedBox(height: 24),
-                          _Reveal(
+                          Reveal(
                             parent: _intro,
                             start: 0.36,
                             child: _PrimaryButton(
@@ -207,13 +190,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                             ),
                           ),
                           const Spacer(flex: 2),
-                          _Reveal(
+                          Reveal(
                             parent: _intro,
                             start: 0.45,
                             child: Text(
                               'ACLC College of Mandaue',
                               textAlign: TextAlign.center,
-                              style: _text(12, color: _C.faint),
+                              style: brandText(12, color: BrandColors.faint),
                             ),
                           ),
                           const SizedBox(height: 16),
@@ -231,41 +214,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
   }
 }
 
-/// Fades and lifts [child] in during its slice of [parent].
-class _Reveal extends StatelessWidget {
-  final Animation<double> parent;
-  final double start;
-  final Widget child;
-
-  const _Reveal({
-    required this.parent,
-    required this.start,
-    required this.child,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final t = CurvedAnimation(
-      parent: parent,
-      curve: Interval(
-        start,
-        (start + 0.55).clamp(0, 1),
-        curve: Curves.easeOutCubic,
-      ),
-    );
-    return FadeTransition(
-      opacity: t,
-      child: SlideTransition(
-        position: Tween(
-          begin: const Offset(0, 0.15),
-          end: Offset.zero,
-        ).animate(t),
-        child: child,
-      ),
-    );
-  }
-}
-
 class _Brand extends StatelessWidget {
   const _Brand();
 
@@ -273,24 +221,9 @@ class _Brand extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(color: _C.line),
-          ),
-          child: ClipOval(
-            child: Image.asset(
-              'images/aclc_logo.jpeg',
-              fit: BoxFit.cover,
-              errorBuilder: (_, _, _) =>
-                  const Icon(Icons.school, color: _C.primary, size: 20),
-            ),
-          ),
-        ),
+        const BrandLogo(size: 40),
         const SizedBox(width: 12),
-        Text('TAMS', style: _text(17, weight: FontWeight.w700, ls: -0.3)),
+        Text('TAMS', style: brandText(17, weight: FontWeight.w700, ls: -0.3)),
       ],
     );
   }
@@ -336,22 +269,22 @@ class _Field extends StatelessWidget {
       textInputAction: textInputAction,
       onFieldSubmitted: onSubmitted,
       validator: validator,
-      cursorColor: _C.primary,
-      style: _text(15, weight: FontWeight.w500),
+      cursorColor: BrandColors.primary,
+      style: brandText(15, weight: FontWeight.w500),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: _text(15, color: _C.faint),
-        errorStyle: _text(12, color: _C.error),
+        hintStyle: brandText(15, color: BrandColors.faint),
+        errorStyle: brandText(12, color: BrandColors.error),
         filled: true,
-        fillColor: _C.field,
-        prefixIcon: Icon(icon, size: 20, color: _C.faint),
+        fillColor: BrandColors.field,
+        prefixIcon: Icon(icon, size: 20, color: BrandColors.faint),
         suffixIcon: suffix,
         contentPadding: const EdgeInsets.symmetric(vertical: 18),
         border: border(Colors.transparent, 0),
         enabledBorder: border(Colors.transparent, 0),
-        focusedBorder: border(_C.primary),
-        errorBorder: border(_C.error.withValues(alpha: 0.5)),
-        focusedErrorBorder: border(_C.error),
+        focusedBorder: border(BrandColors.primary),
+        errorBorder: border(BrandColors.error.withValues(alpha: 0.5)),
+        focusedErrorBorder: border(BrandColors.error),
       ),
     );
   }
@@ -381,7 +314,7 @@ class _ErrorBanner extends StatelessWidget {
                     vertical: 12,
                   ),
                   decoration: BoxDecoration(
-                    color: _C.errorBg,
+                    color: BrandColors.errorBg,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
@@ -390,15 +323,15 @@ class _ErrorBanner extends StatelessWidget {
                       const Icon(
                         Icons.error_outline_rounded,
                         size: 18,
-                        color: _C.error,
+                        color: BrandColors.error,
                       ),
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
                           message!,
-                          style: _text(
+                          style: brandText(
                             13,
-                            color: _C.error,
+                            color: BrandColors.error,
                           ).copyWith(height: 1.4),
                         ),
                       ),
@@ -452,8 +385,10 @@ class _PrimaryButtonState extends State<_PrimaryButton> {
           child: FilledButton(
             onPressed: enabled ? widget.onPressed : null,
             style: FilledButton.styleFrom(
-              backgroundColor: _C.primary,
-              disabledBackgroundColor: _C.primary.withValues(alpha: 0.75),
+              backgroundColor: BrandColors.primary,
+              disabledBackgroundColor: BrandColors.primary.withValues(
+                alpha: 0.75,
+              ),
               elevation: 0,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
@@ -474,7 +409,7 @@ class _PrimaryButtonState extends State<_PrimaryButton> {
                   : Text(
                       widget.label,
                       key: const ValueKey('label'),
-                      style: _text(
+                      style: brandText(
                         16,
                         weight: FontWeight.w600,
                         color: Colors.white,
