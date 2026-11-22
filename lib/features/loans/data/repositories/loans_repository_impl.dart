@@ -11,6 +11,30 @@ class LoansRepositoryImpl implements LoansRepository {
 
   final Dio _dio;
 
+  /// An instructor's open loans are one or two classes' worth, so one
+  /// page of the most the API serves covers them.
+  static const pageSize = 100;
+
+  @override
+  Future<LoansPage> myOpenLoans() async {
+    try {
+      final res = await _dio.get<Object?>(
+        '/loans',
+        queryParameters: {
+          'approvedBy': 'me',
+          'status': 'open',
+          'sort': 'dueAt',
+          'pageSize': pageSize,
+        },
+      );
+      return parseLoansPage(res.data, baseUrl: _dio.options.baseUrl);
+    } on DioException catch (e) {
+      throw Failure.fromDio(e);
+    } on FormatException {
+      throw const Failure('Unexpected response from the server.');
+    }
+  }
+
   @override
   Future<LoanDetail> detail(String id) async {
     try {
