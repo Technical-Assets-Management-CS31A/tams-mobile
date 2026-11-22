@@ -150,7 +150,14 @@ class _Body extends ConsumerWidget {
                 value: at(loan.checkedOutAt),
               ),
               if (loan.dueAt case final due?)
-                _Fact(icon: Icons.event_outlined, label: 'Due', value: at(due)),
+                _Fact(
+                  icon: Icons.event_outlined,
+                  label: 'Due',
+                  value: at(due),
+                  sub: loan.graceMinutes == null
+                      ? null
+                      : 'Includes ${loan.graceMinutes} min grace',
+                ),
               if (loan.overdueAt case final t?)
                 _Fact(
                   icon: Icons.alarm,
