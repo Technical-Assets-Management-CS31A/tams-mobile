@@ -3,10 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/errors/failures.dart';
 import '../../../../core/network/connectivity.dart';
+import '../../../../core/theme/brand.dart';
 import '../../domain/entities/audit.dart';
 import '../controllers/audit_providers.dart';
 import '../controllers/audit_reports.dart';
 
+/// Open, share and sign off a submitted audit's report. Sign off is the
+/// main action when it's available, otherwise Open report is.
 class ReportActions extends ConsumerStatefulWidget {
   const ReportActions({
     super.key,
@@ -60,60 +63,103 @@ class _ReportActionsState extends ConsumerState<ReportActions> {
     final canSignOff = ref.watch(canSignOffProvider);
     final reports = ref.read(auditReportsProvider);
     final enabled = online && _busy == null;
+    final signOff = canSignOff && widget.status == AuditStatus.completed;
 
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+    final openPressed = enabled
+        ? () =>
+              _run('open', () => reports.open(widget.auditId, widget.roomCode))
+        : null;
+    final openIcon = _icon('open', Icons.picture_as_pdf_outlined, signOff);
+    const openLabel = Text('Open report');
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        FilledButton.tonalIcon(
-          key: Key('open-report-${widget.auditId}'),
-          onPressed: enabled
-              ? () => _run(
-                  'open',
-                  () => reports.open(widget.auditId, widget.roomCode),
-                )
-              : null,
-          icon: _icon('open', Icons.picture_as_pdf_outlined),
-          label: const Text('Open report'),
+        Row(
+          children: [
+            Expanded(
+              child: signOff
+                  ? TextButton.icon(
+                      key: Key('open-report-${widget.auditId}'),
+                      onPressed: openPressed,
+                      style: BrandButtons.subtle(),
+                      icon: openIcon,
+                      label: openLabel,
+                    )
+                  : FilledButton.icon(
+                      key: Key('open-report-${widget.auditId}'),
+                      onPressed: openPressed,
+                      style: BrandButtons.primary(),
+                      icon: openIcon,
+                      label: openLabel,
+                    ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: TextButton.icon(
+                key: Key('share-report-${widget.auditId}'),
+                onPressed: enabled
+                    ? () => _run(
+                        'share',
+                        () => reports.share(
+                          widget.auditId,
+                          widget.roomCode,
+                          origin: _origin(),
+                        ),
+                      )
+                    : null,
+                style: BrandButtons.subtle(),
+                icon: _icon('share', Icons.ios_share_rounded, true),
+                label: const Text('Share'),
+              ),
+            ),
+          ],
         ),
-        OutlinedButton.icon(
-          key: Key('share-report-${widget.auditId}'),
-          onPressed: enabled
-              ? () => _run(
-                  'share',
-                  () => reports.share(
-                    widget.auditId,
-                    widget.roomCode,
-                    origin: _origin(),
-                  ),
-                )
-              : null,
-          icon: _icon('share', Icons.ios_share),
-          label: const Text('Share'),
-        ),
-        if (canSignOff && widget.status == AuditStatus.completed)
+        if (signOff) ...[
+          const SizedBox(height: 10),
           FilledButton.icon(
             key: Key('sign-off-${widget.auditId}'),
             onPressed: enabled ? _signOff : null,
-            icon: _icon('sign-off', Icons.verified_outlined),
+            style: BrandButtons.primary(),
+            icon: _icon('sign-off', Icons.verified_outlined, false),
             label: const Text('Sign off'),
           ),
-        if (!online)
-          Text(
-            'Connect to the internet to get the report.',
-            style: Theme.of(context).textTheme.bodySmall,
+        ],
+        if (!online) ...[
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              const Icon(
+                Icons.cloud_off_rounded,
+                size: 16,
+                color: BrandColors.faint,
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Connect to the internet to get the report.',
+                  style: brandText(13, color: BrandColors.muted),
+                ),
+              ),
+            ],
           ),
+        ],
       ],
     );
   }
 
-  Widget _icon(String action, IconData icon) => _busy == action
-      ? const SizedBox(
+  /// [onLight] picks the spinner colour: blue on grey buttons, white on
+  /// blue ones.
+  Widget _icon(String action, IconData icon, bool onLight) => _busy == action
+      ? SizedBox(
           width: 18,
           height: 18,
-          child: CircularProgressIndicator(strokeWidth: 2),
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            color: onLight ? BrandColors.primary : Colors.white,
+          ),
         )
-      : Icon(icon);
+      : Icon(icon, size: 18);
 
   Future<void> _signOff() async {
     final confirmed = await showDialog<bool>(

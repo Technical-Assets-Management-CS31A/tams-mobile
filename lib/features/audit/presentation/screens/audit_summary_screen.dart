@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/errors/failures.dart';
 import '../../../../core/network/connectivity.dart';
+import '../../../../core/theme/brand.dart';
 import '../../../../core/widgets/brand_app_bar.dart';
 import '../../../../core/widgets/empty_state.dart';
 import '../../domain/entities/audit.dart';
@@ -36,6 +37,7 @@ class _AuditSummaryScreenState extends ConsumerState<AuditSummaryScreen> {
     final online = ref.watch(isOnlineProvider);
 
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: brandAppBar(
         context,
         title: session.value == null
@@ -52,7 +54,9 @@ class _AuditSummaryScreenState extends ConsumerState<AuditSummaryScreen> {
               ? error.message
               : 'Something went wrong. Please try again.',
         ),
-        _ => const Center(child: CircularProgressIndicator()),
+        _ => const Center(
+          child: CircularProgressIndicator(color: BrandColors.primary),
+        ),
       },
     );
   }
@@ -93,54 +97,78 @@ class _AuditSummaryScreenState extends ConsumerState<AuditSummaryScreen> {
   }
 
   Widget _submitBar(ScanSession session, bool online) {
-    final theme = Theme.of(context);
     final reason = _blockedReason(session, online);
     final syncing = ref.watch(
       auditSyncControllerProvider.select((s) => s.running),
     );
-    return Material(
-      elevation: 8,
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: BrandColors.line)),
+      ),
       child: SafeArea(
         top: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               if (reason != null) ...[
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        reason,
-                        key: const Key('submit-blocked'),
-                        style: theme.textTheme.bodySmall,
+                Container(
+                  padding: const EdgeInsets.fromLTRB(12, 4, 4, 4),
+                  constraints: const BoxConstraints(minHeight: 44),
+                  decoration: BoxDecoration(
+                    color: BrandColors.warningBg,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.info_outline_rounded,
+                        size: 18,
+                        color: BrandColors.warning,
                       ),
-                    ),
-                    if (online && !syncing)
-                      TextButton(
-                        onPressed: () => ref
-                            .read(auditSyncControllerProvider.notifier)
-                            .syncNow(),
-                        child: const Text('Sync now'),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          reason,
+                          key: const Key('submit-blocked'),
+                          style: brandText(
+                            13,
+                            color: BrandColors.warning,
+                          ).copyWith(height: 1.35),
+                        ),
                       ),
-                  ],
+                      if (online && !syncing)
+                        TextButton(
+                          onPressed: () => ref
+                              .read(auditSyncControllerProvider.notifier)
+                              .syncNow(),
+                          style: BrandButtons.inline(BrandColors.warning),
+                          child: const Text('Sync now'),
+                        ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
               ],
               FilledButton.icon(
                 key: const Key('submit-audit'),
                 onPressed: reason == null && !_submitting
                     ? () => _confirmSubmit(session)
                     : null,
+                style: _bigButton(BrandButtons.primary(height: 54, radius: 14)),
                 icon: _submitting
                     ? const SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: BrandColors.primary,
+                        ),
                       )
-                    : const Icon(Icons.send),
+                    : const Icon(Icons.send_rounded, size: 20),
                 label: const Text('Submit audit'),
               ),
             ],
@@ -156,49 +184,75 @@ class _AuditSummaryScreenState extends ConsumerState<AuditSummaryScreen> {
       context: context,
       showDragHandle: true,
       useSafeArea: true,
-      builder: (context) {
-        final theme = Theme.of(context);
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'Submit the audit of ${session.roster.room.code}?',
-                style: theme.textTheme.titleLarge,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      // Sizes to its content instead of the default 9/16 cap, and
+      // scrolls on short screens.
+      isScrollControlled: true,
+      builder: (context) => SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Submit the audit of ${session.roster.room.code}?',
+              style: brandText(22, weight: FontWeight.w700, ls: -0.5),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              missing == 0
+                  ? 'Every item on the roster was found.'
+                  : '${missing == 1 ? '1 item' : '$missing items'} not '
+                        'scanned will be recorded as missing.',
+              key: const Key('submit-missing'),
+              style: brandText(
+                15,
+                color: BrandColors.muted,
+              ).copyWith(height: 1.45),
+            ),
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: BrandColors.field,
+                borderRadius: BorderRadius.circular(10),
               ),
-              const SizedBox(height: 8),
-              Text(
-                missing == 0
-                    ? 'Every item on the roster was found.'
-                    : '${missing == 1 ? '1 item' : '$missing items'} not '
-                          'scanned will be recorded as missing.',
-                key: const Key('submit-missing'),
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.lock_outline_rounded,
+                    size: 16,
+                    color: BrandColors.muted,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'You cannot scan into this audit after submitting.',
+                      style: brandText(13, color: BrandColors.muted),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 8),
-              Text(
-                'You cannot scan into this audit after submitting.',
-                style: theme.textTheme.bodySmall,
-              ),
-              const SizedBox(height: 24),
-              FilledButton(
-                key: const Key('submit-confirm'),
-                onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('Submit'),
-              ),
-              const SizedBox(height: 8),
-              OutlinedButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
-              ),
-            ],
-          ),
-        );
-      },
+            ),
+            const SizedBox(height: 24),
+            FilledButton(
+              key: const Key('submit-confirm'),
+              onPressed: () => Navigator.of(context).pop(true),
+              style: _bigButton(BrandButtons.primary(height: 54, radius: 14)),
+              child: const Text('Submit'),
+            ),
+            const SizedBox(height: 10),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              style: _bigButton(BrandButtons.subtle(height: 54, radius: 14)),
+              child: const Text('Cancel'),
+            ),
+          ],
+        ),
+      ),
     );
     if (confirmed == true && mounted) await _submit(session.audit);
   }
@@ -234,7 +288,6 @@ class _OpenSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final scans = session.scans;
     List<Widget> tiles(ScanResult result) => [
       for (final s in scans)
@@ -246,7 +299,7 @@ class _OpenSummary extends StatelessWidget {
     ];
 
     return ListView(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(bottom: 24),
       children: [
         if (session.audit.status == AuditStatus.endedElsewhere)
           const OfflineBanner(
@@ -256,11 +309,9 @@ class _OpenSummary extends StatelessWidget {
           ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-          child: Text(
-            '${session.found} of ${session.expected} found',
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
+          child: _ProgressCard(
+            found: session.found,
+            expected: session.expected,
           ),
         ),
         ResultSection(
@@ -313,7 +364,6 @@ class _CompletedView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final audit = detail.audit;
     List<Widget> tiles(ScanResult result) => [
       for (final l in detail.withResult(result))
@@ -331,28 +381,19 @@ class _CompletedView extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 24),
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-          child: Row(
-            children: [
-              Icon(Icons.task_alt, color: theme.colorScheme.primary),
-              const SizedBox(width: 8),
-              Text(
-                audit.status == AuditStatus.signedOff
-                    ? 'Submitted and signed off'
-                    : 'Submitted',
-                key: const Key('audit-submitted'),
-                style: theme.textTheme.titleLarge,
-              ),
-            ],
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
+          child: _SubmittedHeader(
+            signedOff: audit.status == AuditStatus.signedOff,
+            room: roster.room.label,
           ),
         ),
         if (audit.counts case final counts?)
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
             child: AuditCountsRow(counts: counts),
           ),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
           child: ReportActions(
             auditId: audit.id,
             roomCode: roster.room.code,
@@ -382,21 +423,127 @@ class _StoredCompleted extends StatelessWidget {
   Widget build(BuildContext context) {
     final serverId = audit.serverId;
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
       children: [
-        Text('Submitted', style: Theme.of(context).textTheme.titleLarge),
+        _SubmittedHeader(
+          signedOff: audit.status == AuditStatus.signedOff,
+          room: roster.room.label,
+        ),
         if (audit.counts case final counts?)
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 16),
+            padding: const EdgeInsets.only(top: 16),
             child: AuditCountsRow(counts: counts),
           ),
         if (serverId != null)
-          ReportActions(
-            auditId: serverId,
-            roomCode: roster.room.code,
-            status: audit.status,
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: ReportActions(
+              auditId: serverId,
+              roomCode: roster.room.code,
+              status: audit.status,
+            ),
           ),
       ],
     );
   }
 }
+
+/// Found count, percentage and bar at the top of an open audit's summary.
+class _ProgressCard extends StatelessWidget {
+  const _ProgressCard({required this.found, required this.expected});
+
+  final int found;
+  final int expected;
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = expected == 0 ? 0.0 : found / expected;
+    return BrandCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Text(
+                  '$found of $expected found',
+                  style: brandText(22, weight: FontWeight.w700, ls: -0.5),
+                ),
+              ),
+              Text(
+                '${(progress * 100).round()}%',
+                style: brandText(
+                  14,
+                  weight: FontWeight.w600,
+                  color: BrandColors.primary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          LinearProgressIndicator(
+            value: progress,
+            minHeight: 8,
+            color: BrandColors.primary,
+            backgroundColor: BrandColors.field,
+            borderRadius: BorderRadius.circular(999),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Green tick, "Submitted" and the room, for an audit that's done.
+class _SubmittedHeader extends StatelessWidget {
+  const _SubmittedHeader({required this.signedOff, required this.room});
+
+  final bool signedOff;
+  final String room;
+
+  @override
+  Widget build(BuildContext context) => Row(
+    children: [
+      Container(
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(
+          color: BrandColors.successBg,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Icon(
+          signedOff ? Icons.verified_rounded : Icons.task_alt_rounded,
+          color: BrandColors.success,
+          size: 26,
+        ),
+      ),
+      const SizedBox(width: 14),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              signedOff ? 'Submitted and signed off' : 'Submitted',
+              key: const Key('audit-submitted'),
+              style: brandText(20, weight: FontWeight.w700, ls: -0.4),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              room,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: brandText(13, color: BrandColors.muted),
+            ),
+          ],
+        ),
+      ),
+    ],
+  );
+}
+
+/// The 16 pt label the login screen's button uses, for full-width buttons.
+ButtonStyle _bigButton(ButtonStyle style) => style.copyWith(
+  textStyle: WidgetStatePropertyAll(brandText(16, weight: FontWeight.w600)),
+);
