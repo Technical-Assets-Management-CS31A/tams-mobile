@@ -89,6 +89,26 @@ void main() {
       },
     );
 
+    test('online continues an audit I left open on the server', () async {
+      final mine = server.seedAudit();
+
+      final audit = await sessions.start(lab1, online: true);
+
+      expect(server.startCalls, 0);
+      expect(audit.serverId, mine.id);
+      expect(audit.startedAt, mine.startedAt);
+      expect((await store.roster(lab1.id))!.items, hasLength(3));
+    });
+
+    test("online does not continue someone else's audit", () async {
+      final theirs = server.seedAudit(startedBy: 'user-2');
+
+      final audit = await sessions.start(lab1, online: true);
+
+      expect(server.startCalls, 1);
+      expect(audit.serverId, isNot(theirs.id));
+    });
+
     test('a server error is not hidden', () async {
       final s = AuditSessionService(
         repository: _FailingStart(),
