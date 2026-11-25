@@ -25,7 +25,7 @@ const assetB = '22222222-2222-4222-8222-222222222222';
 const assetC = '33333333-3333-4333-8333-333333333333';
 const strayAsset = '99999999-9999-4999-8999-999999999999';
 
-Roster roster({
+Roster labRoster({
   AuditRoom room = lab1,
   List<RosterItem>? items,
   DateTime? downloadedAt,
