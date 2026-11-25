@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:tams_mobile/core/network/token_provider.dart';
+import 'package:tams_mobile/features/audit/data/datasources/audit_local_datasource.dart';
+import 'package:tams_mobile/features/audit/data/local/audit_database.dart';
 import 'package:tams_mobile/features/alerts/presentation/controllers/alerts_controller.dart';
 import 'package:tams_mobile/features/approvals/presentation/controllers/approvals_controller.dart';
 import 'package:tams_mobile/features/auth/domain/entities/user.dart';
@@ -12,7 +14,10 @@ import 'package:tams_mobile/features/loans/presentation/controllers/loan_detail_
 import 'package:tams_mobile/features/shell/presentation/widgets/shell_header.dart';
 import 'package:tams_mobile/routing/app_router.dart';
 
+import '../../helpers/audit_fixtures.dart';
+import '../../helpers/audit_overrides.dart';
 import '../../helpers/fake_alerts_repository.dart';
+import '../../helpers/fake_audit_repository.dart';
 import '../../helpers/fake_approvals_repository.dart';
 import '../../helpers/fake_loans_repository.dart';
 
@@ -24,8 +29,12 @@ class _FakeAuth extends AuthController {
   int logouts = 0;
 
   @override
-  Future<User?> build() async =>
-      User(email: 'teacher@school.edu', token: 'test-token', role: role);
+  Future<User?> build() async => User(
+    email: 'teacher@school.edu',
+    token: 'test-token',
+    id: 'user-1',
+    role: role,
+  );
 
   @override
   Future<void> logout() async => logouts++;
@@ -35,6 +44,8 @@ Future<GoRouter> _pumpShell(
   WidgetTester tester, {
   FakeAlertsRepository? alerts,
   _FakeAuth? auth,
+  AuditDatabase? database,
+  FakeAuditRepository? server,
 }) async {
   final router = GoRouter(
     initialLocation: homeLocation,
@@ -54,6 +65,10 @@ Future<GoRouter> _pumpShell(
         loansRepositoryProvider.overrideWithValue(FakeLoansRepository()),
         authTokenProvider.overrideWith(SignedInToken.new),
         authControllerProvider.overrideWith(() => auth ?? _FakeAuth()),
+        ...auditOverrides(
+          server: server ?? (FakeAuditRepository()..roomList.clear()),
+          database: database,
+        ),
       ],
       child: MaterialApp.router(routerConfig: router),
     ),
@@ -150,7 +165,7 @@ void main() {
     const cases = [
       ('My Loans', '/loans', 'No active loans'),
       ('Alerts', '/alerts', "You're all caught up"),
-      ('Audit', '/audit', 'No activity yet'),
+      ('Audit', '/audit', 'No rooms yet'),
       ('Approvals', '/approvals', 'No pending approvals'),
     ];
     for (final (label, path, emptyTitle) in cases) {
@@ -219,6 +234,37 @@ void main() {
 
       expect(find.text('Sign out?'), findsNothing);
       expect(auth.logouts, 0);
+    });
+
+    testWidgets('warns when audit scans have not synced', (tester) async {
+      final database = await memoryAuditDatabase();
+      final store = AuditLocalDataSource(database, userId: 'user-1');
+      await store.insertAudit(openAudit());
+      await store.addScan(scan('s-1'));
+      await store.addScan(scan('s-2', value: assetB, assetId: assetB));
+      final auth = _FakeAuth();
+      await _pumpShell(
+        tester,
+        auth: auth,
+        database: database,
+        server: FakeAuditRepository()..offline = true,
+      );
+      final container = ProviderScope.containerOf(
+        tester.element(find.byType(NavigationBar)),
+      );
+      await container.read(authControllerProvider.future);
+
+      await tester.tap(find.byTooltip('Sign out'));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('sign-out-unsynced')), findsOneWidget);
+      expect(find.textContaining("2 audit scans haven't synced"), findsOne);
+    });
+
+    testWidgets('no warning when everything synced', (tester) async {
+      await openSheet(tester);
+
+      expect(find.byKey(const Key('sign-out-unsynced')), findsNothing);
     });
 
     testWidgets('confirming signs out', (tester) async {
