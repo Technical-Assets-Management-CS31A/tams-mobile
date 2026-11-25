@@ -44,6 +44,14 @@ class TokenRefresher {
       token: tokens.$1,
       refreshToken: tokens.$2 ?? refreshToken,
     );
+    // The user may have signed out while the tokens were being saved. Signing
+    // out clears storage first, so remove what was just written, and don't
+    // bring the token back.
+    final current = _ref.read(authTokenProvider);
+    if (current != expired) {
+      if (current == null) await storage.clear();
+      return current;
+    }
     _ref.read(authTokenProvider.notifier).set(tokens.$1);
     return tokens.$1;
   }

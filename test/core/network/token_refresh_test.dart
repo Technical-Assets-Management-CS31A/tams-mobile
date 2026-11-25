@@ -16,8 +16,16 @@ void main() {
   final oldToken = fakeJwt(DateTime.now().add(const Duration(minutes: 5)));
   late DebugPrintCallback originalDebugPrint;
 
-  Future<ProviderContainer> signedIn(RouteHttpAdapter adapter) async {
-    final container = ProviderContainer();
+  Future<ProviderContainer> signedIn(
+    RouteHttpAdapter adapter, {
+    TokenStorage? tokenStorage,
+  }) async {
+    final container = ProviderContainer(
+      overrides: [
+        if (tokenStorage != null)
+          tokenStorageProvider.overrideWithValue(tokenStorage),
+      ],
+    );
     addTearDown(container.dispose);
     container.read(dioProvider).httpClientAdapter = adapter;
     container.listen(authControllerProvider, (_, _) {});
@@ -121,6 +129,32 @@ void main() {
     expect(await storage.readToken(), isNull);
   });
 
+  test('signing out while the new tokens are saved stays signed out', () async {
+    final adapter = RouteHttpAdapter(
+      (r) => switch (r.path) {
+        '/auth/refresh' => refreshed(r),
+        _ => problem(401, 'UNAUTHORIZED'),
+      },
+    );
+    late ProviderContainer c;
+    final slowStorage = _BeforeSaveTokens(
+      () => c.read(authControllerProvider.notifier).logout(),
+    );
+    c = await signedIn(adapter, tokenStorage: slowStorage);
+
+    await expectLater(
+      c.read(dioProvider).get('/items'),
+      throwsA(isA<DioException>()),
+    );
+    await pumpEventQueue();
+
+    expect(c.read(authControllerProvider).value, isNull);
+    expect(c.read(authTokenProvider), isNull);
+    expect(await storage.readToken(), isNull);
+    expect(await storage.readRefreshToken(), isNull);
+    expect(adapter.to('GET', '/items'), hasLength(1));
+  });
+
   test('no connection during the refresh keeps the user signed in', () async {
     final adapter = RouteHttpAdapter(
       (r) =>
@@ -168,4 +202,23 @@ void main() {
     expect(c.read(authControllerProvider).value?.email, 'a@b.com');
     expect(c.read(authTokenProvider), expired);
   });
+}
+
+/// Runs [beforeSave] (e.g. a sign-out) once, just before the refreshed
+/// tokens are written, the way a sign-out lands during a slow save.
+class _BeforeSaveTokens extends TokenStorage {
+  _BeforeSaveTokens(this.beforeSave) : super(const FlutterSecureStorage());
+
+  Future<void> Function()? beforeSave;
+
+  @override
+  Future<void> saveTokens({
+    required String token,
+    required String refreshToken,
+  }) async {
+    final run = beforeSave;
+    beforeSave = null;
+    await run?.call();
+    await super.saveTokens(token: token, refreshToken: refreshToken);
+  }
 }
