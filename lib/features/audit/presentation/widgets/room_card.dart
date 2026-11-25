@@ -119,29 +119,22 @@ class RoomCard extends StatelessWidget {
                 ),
               ],
               const SizedBox(height: 14),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextButton.icon(
-                      key: Key('download-${room.id}'),
-                      onPressed: online && !busy ? onDownload : null,
-                      style: BrandButtons.subtle(),
-                      icon: Icon(
-                        roster == null
-                            ? Icons.download_rounded
-                            : Icons.refresh_rounded,
-                        size: 18,
-                      ),
-                      label: Text(
-                        roster == null ? 'Download roster' : 'Download again',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
+              _ActionRow(
+                download: TextButton.icon(
+                  key: Key('download-${room.id}'),
+                  onPressed: online && !busy ? onDownload : null,
+                  style: _compact(BrandButtons.subtle()),
+                  icon: Icon(
+                    roster == null
+                        ? Icons.download_rounded
+                        : Icons.refresh_rounded,
+                    size: _iconSize,
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(child: _mainAction(open, endedElsewhere, canStart)),
-                ],
+                  label: Text(_downloadLabel),
+                ),
+                downloadLabel: _downloadLabel,
+                main: _mainAction(open, endedElsewhere, canStart),
+                mainLabel: _mainLabel(open, endedElsewhere),
               ),
             ],
           ),
@@ -149,6 +142,15 @@ class RoomCard extends StatelessWidget {
       ),
     );
   }
+
+  String get _downloadLabel =>
+      roster == null ? 'Download roster' : 'Download again';
+
+  static String _mainLabel(bool open, bool endedElsewhere) => endedElsewhere
+      ? 'Discard'
+      : open
+      ? 'Resume'
+      : 'Start';
 
   Widget _mainAction(bool open, bool endedElsewhere, bool canStart) {
     if (busy) {
@@ -170,19 +172,84 @@ class RoomCard extends StatelessWidget {
       return OutlinedButton(
         key: Key('discard-${room.id}'),
         onPressed: onDiscard,
-        style: BrandButtons.danger(),
-        child: const Text('Discard'),
+        style: _compact(BrandButtons.danger()),
+        child: Text(_mainLabel(open, endedElsewhere)),
       );
     }
     return FilledButton.icon(
       key: Key('start-${room.id}'),
       onPressed: canStart ? onStart : null,
-      style: BrandButtons.primary(),
+      style: _compact(BrandButtons.primary()),
       icon: Icon(
         open ? Icons.play_arrow_rounded : Icons.qr_code_scanner_rounded,
-        size: 18,
+        size: _iconSize,
       ),
-      label: Text(open ? 'Resume' : 'Start'),
+      label: Text(_mainLabel(open, endedElsewhere)),
+    );
+  }
+}
+
+const _iconSize = 16.0;
+const _hPad = 12.0;
+const _gap = 10.0;
+
+/// Tighter side padding than the shared style, so both labels fit whole.
+ButtonStyle _compact(ButtonStyle style) => style.copyWith(
+  padding: const WidgetStatePropertyAll(
+    EdgeInsets.symmetric(horizontal: _hPad),
+  ),
+);
+
+/// The download and main buttons side by side, download as wide as its
+/// label and the main one taking the rest. When both labels can't fit in
+/// full, such as on a narrow phone or with large system text, the buttons
+/// stack full-width instead of cutting a label short.
+class _ActionRow extends StatelessWidget {
+  const _ActionRow({
+    required this.download,
+    required this.downloadLabel,
+    required this.main,
+    required this.mainLabel,
+  });
+
+  final Widget download;
+  final String downloadLabel;
+  final Widget main;
+  final String mainLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final scaler = MediaQuery.textScalerOf(context);
+    final style = brandText(14, weight: FontWeight.w600);
+    double width(String label) {
+      final painter = TextPainter(
+        text: TextSpan(text: label, style: style),
+        textDirection: TextDirection.ltr,
+        textScaler: scaler,
+        maxLines: 1,
+      )..layout();
+      final w = painter.width;
+      painter.dispose();
+      // Padding both sides, the icon, and the button's icon-to-label gap.
+      return w + _hPad * 2 + _iconSize + 8;
+    }
+
+    // A little slack for rounding and font hinting.
+    final needed = width(downloadLabel) + width(mainLabel) + _gap + 8;
+
+    return LayoutBuilder(
+      builder: (context, box) => needed <= box.maxWidth
+          ? Row(
+              children: [
+                download,
+                const SizedBox(width: _gap),
+                Expanded(child: main),
+              ],
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [main, const SizedBox(height: 8), download],
+            ),
     );
   }
 }
