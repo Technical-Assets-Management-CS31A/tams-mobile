@@ -23,6 +23,14 @@ class TokenStorage {
     }
   }
 
+  Future<void> saveTokens({
+    required String token,
+    required String refreshToken,
+  }) async {
+    await _storage.write(key: _tokenKey, value: token);
+    await _storage.write(key: _refreshTokenKey, value: refreshToken);
+  }
+
   Future<String?> readToken() => _storage.read(key: _tokenKey);
   Future<String?> readRefreshToken() => _storage.read(key: _refreshTokenKey);
   Future<String?> readEmail() => _storage.read(key: _emailKey);

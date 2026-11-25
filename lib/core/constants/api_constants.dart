@@ -21,4 +21,6 @@ class ApiConstants {
 
   /// Takes `{email, password}`; returns the access and refresh tokens.
   static const loginPath = '/auth/login';
+
+  static const refreshPath = '/auth/refresh';
 }

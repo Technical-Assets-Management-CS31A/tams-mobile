@@ -204,7 +204,7 @@ void main() {
     expect(await storage.readRefreshToken(), isNull);
   });
 
-  group('server rejects the token (401)', () {
+  group('server rejects the token and the refresh token (401)', () {
     test('signs the user out and clears storage', () async {
       final adapter = FakeHttpAdapter(body: loginResponse());
       final c = makeContainer(adapter);
@@ -220,10 +220,8 @@ void main() {
       );
       await pumpEventQueue();
 
-      expect(
-        adapter.lastRequest!.headers['Authorization'],
-        'Bearer access-token',
-      );
+      expect(adapter.lastRequest!.path, '/auth/refresh');
+      expect(adapter.lastRequest!.data, {'refreshToken': 'refresh-token'});
       expect(c.read(authControllerProvider).value, isNull);
       expect(c.read(authTokenProvider), isNull);
       expect(await storage.readToken(), isNull);
