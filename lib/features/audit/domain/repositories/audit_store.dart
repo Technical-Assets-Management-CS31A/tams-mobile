@@ -8,6 +8,10 @@ abstract interface class AuditStore {
 
   Future<void> cacheRooms(List<AuditRoom> rooms);
 
+  /// Saves [rooms] as this user's whole room list, dropping saved rooms
+  /// the server no longer returns.
+  Future<void> replaceRooms(List<AuditRoom> rooms);
+
   Future<List<AuditRoom>> cachedRooms({String query = ''});
 
   Future<void> saveRoster(Roster roster);

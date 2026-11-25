@@ -57,6 +57,16 @@ void main() {
       expect((await mine.cachedRooms(query: '%')).single.id, 'r-3');
       expect(await mine.cachedRooms(query: r'\'), isEmpty);
     });
+
+    test('replacing rooms drops the ones no longer listed', () async {
+      await mine.cacheRooms([lab1, storageRoom]);
+      await theirs.cacheRooms([storageRoom]);
+
+      await mine.replaceRooms([lab1]);
+
+      expect((await mine.cachedRooms()).single.id, lab1.id);
+      expect((await theirs.cachedRooms()).single.id, storageRoom.id);
+    });
   });
 
   group('rosters', () {
