@@ -67,4 +67,22 @@ void main() {
     expect(output, contains('ERROR 401'));
     expect(output, isNot(contains('err-TOKEN-9')));
   });
+
+  test('a failure without a response logs its cause and duration', () async {
+    final dio = fakeDio(
+      FakeHttpAdapter(
+        error: DioExceptionType.connectionError,
+        cause: 'Connection refused',
+      ),
+    )..interceptors.add(RedactingLogInterceptor());
+
+    await expectLater(dio.get('/rooms'), throwsA(isA<DioException>()));
+
+    final output = logs.join('\n');
+    expect(
+      output,
+      matches(RegExp(r'ERROR connectionError \S+/rooms \(\d+ ms\)')),
+    );
+    expect(output, contains('cause: Connection refused'));
+  });
 }
