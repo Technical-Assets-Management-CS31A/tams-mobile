@@ -3,13 +3,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/errors/failures.dart';
 import '../../../../core/network/connectivity.dart';
+import '../../../../core/theme/brand.dart';
 import '../../../../core/utils/clock.dart';
 import '../../../../core/utils/time_format.dart';
+import '../../../../core/widgets/brand_app_bar.dart';
 import '../../../../core/widgets/empty_state.dart';
 import '../../domain/entities/audit.dart';
 import '../../domain/entities/audit_room.dart';
 import '../controllers/audit_providers.dart';
 import '../controllers/audit_reports.dart';
+import '../widgets/audit_results.dart';
 import '../widgets/report_actions.dart';
 
 final _cachedRoomProvider = FutureProvider.autoDispose
@@ -35,7 +38,12 @@ class RoomAuditsScreen extends ConsumerWidget {
     final code = room?.code ?? '';
 
     return Scaffold(
-      appBar: AppBar(title: Text(room?.label ?? 'Room')),
+      backgroundColor: Colors.white,
+      appBar: brandAppBar(
+        context,
+        title: room?.label ?? 'Room',
+        subtitle: 'Past audits',
+      ),
       body: !online
           ? const EmptyState(
               icon: Icons.cloud_off_outlined,
@@ -43,6 +51,7 @@ class RoomAuditsScreen extends ConsumerWidget {
               message: 'Connect to the internet to see past audits.',
             )
           : RefreshIndicator(
+              color: BrandColors.primary,
               onRefresh: () => ref.refresh(roomAuditsProvider(roomId).future),
               child: switch (audits) {
                 AsyncValue(:final value?) when value.isEmpty => ListView(
@@ -60,7 +69,7 @@ class RoomAuditsScreen extends ConsumerWidget {
                 AsyncValue(:final value?) => ListView.separated(
                   padding: const EdgeInsets.all(16),
                   itemCount: value.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 10),
+                  separatorBuilder: (_, _) => const SizedBox(height: 12),
                   itemBuilder: (context, i) => _AuditCard(
                     audit: value[i],
                     roomCode: code,
@@ -80,7 +89,9 @@ class RoomAuditsScreen extends ConsumerWidget {
                     ),
                   ],
                 ),
-                _ => const Center(child: CircularProgressIndicator()),
+                _ => const Center(
+                  child: CircularProgressIndicator(color: BrandColors.primary),
+                ),
               },
             ),
     );
@@ -102,51 +113,101 @@ class _AuditCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final counts = audit.counts;
     final when = audit.completedAt ?? audit.startedAt;
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'Completed ${formatDateTime(when, now: now)}',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+    final signedOff = audit.status == AuditStatus.signedOff;
+    return BrandCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: signedOff
+                      ? BrandColors.successBg
+                      : BrandColors.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                if (audit.status == AuditStatus.signedOff)
-                  Icon(Icons.verified, color: theme.colorScheme.primary),
-              ],
-            ),
-            if (counts != null)
-              Text(
-                '${counts.matched} of ${counts.expected} found · '
-                '${counts.missing} missing · ${counts.misplaced} misplaced · '
-                '${counts.unknown} unknown',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+                child: Icon(
+                  signedOff ? Icons.verified_rounded : Icons.task_alt_rounded,
+                  size: 22,
+                  color: signedOff ? BrandColors.success : BrandColors.primary,
                 ),
               ),
-            if (audit.status == AuditStatus.signedOff)
-              Text('Signed off', style: theme.textTheme.bodySmall),
-            const SizedBox(height: 12),
-            ReportActions(
-              auditId: audit.id,
-              roomCode: roomCode,
-              status: audit.status,
-              onSignedOff: (_) => onSignedOff(),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Completed ${formatDateTime(when, now: now)}',
+                      style: brandText(15, weight: FontWeight.w600, ls: -0.2),
+                    ),
+                    if (counts != null) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        '${counts.matched} of ${counts.expected} found',
+                        style: brandText(13, color: BrandColors.muted),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              if (signedOff)
+                const Padding(
+                  padding: EdgeInsets.only(left: 8),
+                  child: BrandPill(
+                    'Signed off',
+                    color: BrandColors.success,
+                    background: BrandColors.successBg,
+                  ),
+                ),
+            ],
+          ),
+          if (counts != null) ...[
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                _Count('Missing', counts.missing, BrandColors.error),
+                _Count('Misplaced', counts.misplaced, BrandColors.warning),
+                _Count('Unknown', counts.unknown, BrandColors.muted),
+              ],
             ),
           ],
-        ),
+          const SizedBox(height: 14),
+          ReportActions(
+            auditId: audit.id,
+            roomCode: roomCode,
+            status: audit.status,
+            onSignedOff: (_) => onSignedOff(),
+          ),
+        ],
       ),
+    );
+  }
+}
+
+/// "2 missing" in [color], or greyed out when there are none.
+class _Count extends StatelessWidget {
+  const _Count(this.label, this.value, this.color);
+
+  final String label;
+  final int value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final none = value == 0;
+    return BrandPill(
+      '$value ${label.toLowerCase()}',
+      color: none ? BrandColors.faint : color,
+      background: none ? BrandColors.field : color.withValues(alpha: 0.1),
     );
   }
 }
