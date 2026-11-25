@@ -19,6 +19,20 @@ class AuditLocalDataSource implements AuditStore {
   @override
   Future<void> cacheRooms(List<AuditRoom> rooms) async {
     final batch = _db.batch();
+    _insertRooms(batch, rooms);
+    await batch.commit(noResult: true);
+  }
+
+  @override
+  Future<void> replaceRooms(List<AuditRoom> rooms) =>
+      _db.transaction((tx) async {
+        final batch = tx.batch();
+        batch.delete('rooms', where: 'user_id = ?', whereArgs: [userId]);
+        _insertRooms(batch, rooms);
+        await batch.commit(noResult: true);
+      });
+
+  void _insertRooms(Batch batch, List<AuditRoom> rooms) {
     for (final r in rooms) {
       batch.insert('rooms', {
         'user_id': userId,
@@ -31,7 +45,6 @@ class AuditLocalDataSource implements AuditStore {
         'status': r.status,
       }, conflictAlgorithm: ConflictAlgorithm.replace);
     }
-    await batch.commit(noResult: true);
   }
 
   @override

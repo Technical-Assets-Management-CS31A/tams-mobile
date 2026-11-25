@@ -81,7 +81,11 @@ class AuditRoomsController extends AsyncNotifier<AuditRoomsState> {
               .read(auditRepositoryProvider)
               .rooms(query: query)
               .timeout(_limit);
-          await store.cacheRooms(page.items);
+          await _save(
+            store,
+            page.items,
+            whole: query.isEmpty && page.items.length >= page.total,
+          );
           return AuditRoomsState(
             rooms: page.items,
             query: query,
@@ -115,6 +119,14 @@ class AuditRoomsController extends AsyncNotifier<AuditRoomsState> {
     }
   }
 
+  /// Saves fetched rooms for offline use. Once [whole] says [rooms] is the
+  /// full unfiltered server list, rooms deleted on the server are dropped.
+  Future<void> _save(
+    AuditStore store,
+    List<AuditRoom> rooms, {
+    required bool whole,
+  }) => whole ? store.replaceRooms(rooms) : store.cacheRooms(rooms);
+
   Future<void> search(String query) async {
     final q = query.trim();
     _query = q;
@@ -141,10 +153,12 @@ class AuditRoomsController extends AsyncNotifier<AuditRoomsState> {
           .read(auditRepositoryProvider)
           .rooms(query: current.query, page: current.page + 1)
           .timeout(_limit);
+      final merged = current.adding(next);
       final store = await ref.read(auditStoreProvider.future);
-      await store.cacheRooms(next.items);
+      final whole = current.query.isEmpty && merged.rooms.length >= next.total;
+      await _save(store, whole ? merged.rooms : next.items, whole: whole);
       if (ref.mounted && identical(state.value, current)) {
-        state = AsyncData(current.adding(next));
+        state = AsyncData(merged);
       }
     } catch (e) {
       debugPrint('Could not load more rooms: $e');

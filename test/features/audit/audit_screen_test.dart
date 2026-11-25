@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:tams_mobile/features/audit/data/datasources/audit_local_datasource.dart';
 import 'package:tams_mobile/features/audit/data/local/audit_database.dart';
+import 'package:tams_mobile/features/audit/domain/entities/audit_room.dart';
 import 'package:tams_mobile/features/audit/presentation/screens/audit_screen.dart';
 import 'package:tams_mobile/features/auth/presentation/controllers/auth_controller.dart';
 
@@ -80,6 +81,27 @@ void main() {
     expect(find.text('Storage 1'), findsOneWidget);
     expect(find.text('Roster not downloaded'), findsNWidgets(2));
     expect((await store.cachedRooms()).map((r) => r.code), ['CL1', 'ST1']);
+  });
+
+  testWidgets('forgets saved rooms the server no longer lists', (tester) async {
+    const old = AuditRoom(id: 'room-old3', code: 'OLD-3', name: 'Old room');
+    await store.cacheRooms([old, lab1]);
+
+    await pumpRooms(tester);
+
+    expect((await store.cachedRooms()).map((r) => r.code), ['CL1', 'ST1']);
+  });
+
+  testWidgets('a search keeps saved rooms it does not match', (tester) async {
+    await pumpRooms(tester);
+    const old = AuditRoom(id: 'room-old3', code: 'OLD-3', name: 'Old room');
+    await store.cacheRooms([old]);
+
+    await tester.enterText(find.byType(TextField), 'storage');
+    await tester.pump(const Duration(milliseconds: 500));
+    await tester.pumpAndSettle();
+
+    expect((await store.cachedRooms()).map((r) => r.code), contains('OLD-3'));
   });
 
   testWidgets('downloading a roster shows its size and age', (tester) async {
