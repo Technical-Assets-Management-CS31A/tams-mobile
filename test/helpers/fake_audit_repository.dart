@@ -40,6 +40,9 @@ class FakeAuditRepository implements AuditRepository {
 
   /// When set, room lists wait for it, e.g. a server that never answers.
   Future<void>? roomsAnswer;
+
+  /// When set, completing an audit waits for it, e.g. a slow submit.
+  Future<void>? completeAnswer;
   bool loseNextResponse = false;
   bool loseNextCompleteResponse = false;
   int? answerOnly;
@@ -200,6 +203,7 @@ class FakeAuditRepository implements AuditRepository {
 
   @override
   Future<AuditDetail> complete(String auditId) async {
+    if (completeAnswer case final answer?) await answer;
     _reach();
     completeCalls++;
     final audit = serverAudits[auditId]!;

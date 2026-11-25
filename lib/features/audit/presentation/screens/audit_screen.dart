@@ -190,17 +190,20 @@ class _AuditScreenState extends ConsumerState<AuditScreen> {
   }
 
   Future<void> _download(AuditRoom room) => _run(room, () async {
+    final revision = ref.read(auditRevisionProvider.notifier);
     final service = await ref.read(auditSessionServiceProvider.future);
     final roster = await service.downloadRoster(room);
-    ref.read(auditRevisionProvider.notifier).bump();
+    revision.bump();
     final n = roster.items.length;
     _say('Downloaded ${n == 1 ? '1 item' : '$n items'} for ${room.code}.');
   });
 
   Future<void> _start(AuditRoom room) => _run(room, () async {
+    final revision = ref.read(auditRevisionProvider.notifier);
+    final online = ref.read(isOnlineProvider);
     final service = await ref.read(auditSessionServiceProvider.future);
-    final audit = await service.start(room, online: ref.read(isOnlineProvider));
-    ref.read(auditRevisionProvider.notifier).bump();
+    final audit = await service.start(room, online: online);
+    revision.bump();
     if (mounted) await context.push(auditScanLocation(audit.localId));
   });
 
@@ -228,9 +231,10 @@ class _AuditScreenState extends ConsumerState<AuditScreen> {
     );
     if (confirmed != true || !mounted) return;
     await _run(room, () async {
+      final revision = ref.read(auditRevisionProvider.notifier);
       final service = await ref.read(auditSessionServiceProvider.future);
       await service.discard(audit);
-      ref.read(auditRevisionProvider.notifier).bump();
+      revision.bump();
     });
   }
 

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -6,6 +8,7 @@ import 'package:tams_mobile/features/audit/data/local/audit_database.dart';
 import 'package:tams_mobile/features/audit/domain/entities/audit.dart';
 import 'package:tams_mobile/features/audit/domain/entities/audit_scan.dart';
 import 'package:tams_mobile/features/audit/domain/services/audit_sync_service.dart';
+import 'package:tams_mobile/features/audit/presentation/controllers/audit_providers.dart';
 import 'package:tams_mobile/features/audit/presentation/screens/audit_summary_screen.dart';
 import 'package:tams_mobile/features/auth/domain/entities/user_role.dart';
 import 'package:tams_mobile/features/auth/presentation/controllers/auth_controller.dart';
@@ -135,6 +138,48 @@ void main() {
     final local = (await store.audit('local-1'))!;
     expect(local.status, AuditStatus.completed);
     expect(await store.scans('local-1'), isEmpty);
+  });
+
+  testWidgets('leaving while the submit runs still refreshes the rooms', (
+    tester,
+  ) async {
+    await syncFirst();
+    final answer = Completer<void>();
+    server.completeAnswer = answer.future;
+    final overrides = [
+      ...auditOverrides(
+        server: server,
+        database: database,
+        connection: Stream.value(true),
+      ),
+      authControllerProvider.overrideWith(
+        () => SignedInAuditor(UserRole.techStaff),
+      ),
+    ];
+    Widget app(Widget home) => ProviderScope(
+      overrides: overrides,
+      child: MaterialApp(home: home),
+    );
+    await tester.pumpWidget(
+      app(const AuditSummaryScreen(localAuditId: 'local-1')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Submit audit'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('submit-confirm')));
+    await tester.pump();
+    final container = ProviderScope.containerOf(
+      tester.element(find.byType(AuditSummaryScreen)),
+    );
+    final before = container.read(auditRevisionProvider);
+
+    await tester.pumpWidget(app(const SizedBox()));
+    answer.complete();
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(server.completeCalls, 1);
+    expect(container.read(auditRevisionProvider), greaterThan(before));
   });
 
   testWidgets('custodians cannot sign off', (tester) async {

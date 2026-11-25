@@ -255,6 +255,8 @@ class _AuditSummaryScreenState extends ConsumerState<AuditSummaryScreen> {
 
   Future<void> _submit(LocalAudit audit) async {
     setState(() => _submitting = true);
+    // Read before any await: the user can leave while the submit runs.
+    final revision = ref.read(auditRevisionProvider.notifier);
     try {
       final service = await ref.read(auditSessionServiceProvider.future);
       final detail = await service.complete(audit);
@@ -264,7 +266,7 @@ class _AuditSummaryScreenState extends ConsumerState<AuditSummaryScreen> {
     } on Failure catch (f) {
       _say(f.message);
     } finally {
-      ref.read(auditRevisionProvider.notifier).bump();
+      revision.bump();
       if (mounted) setState(() => _submitting = false);
     }
   }
