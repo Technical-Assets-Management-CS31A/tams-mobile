@@ -81,6 +81,13 @@ final auditSyncServiceProvider = FutureProvider<AuditSyncService>(
   ),
 );
 
+/// The longest the room list may load before the screen shows a time-out.
+/// Dio's own limits apply per phase and restart on a token refresh, so a
+/// load could otherwise spin for well over 30 seconds.
+final auditRoomsTimeoutProvider = Provider<Duration>(
+  (ref) => const Duration(seconds: 20),
+);
+
 class AuditRevision extends Notifier<int> {
   @override
   int build() => 0;

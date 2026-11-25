@@ -37,6 +37,9 @@ class FakeAuditRepository implements AuditRepository {
   int startCalls = 0;
   int completeCalls = 0;
   bool offline = false;
+
+  /// When set, room lists wait for it, e.g. a server that never answers.
+  Future<void>? roomsAnswer;
   bool loseNextResponse = false;
   bool loseNextCompleteResponse = false;
   int? answerOnly;
@@ -80,6 +83,7 @@ class FakeAuditRepository implements AuditRepository {
 
   @override
   Future<RoomsPage> rooms({String query = '', int page = 1}) async {
+    if (roomsAnswer case final answer?) await answer;
     _reach();
     final q = query.trim().toLowerCase();
     final matching = [
