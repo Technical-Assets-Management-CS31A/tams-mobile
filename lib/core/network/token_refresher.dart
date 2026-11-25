@@ -15,6 +15,17 @@ class TokenRefresher {
   final Dio _dio;
   Future<String?>? _running;
 
+  /// The last expired token and the token it was renewed to.
+  (String, String)? _renewed;
+
+  /// The current token, when it was renewed from [sent]. A request sent with
+  /// an older token is retried only then: after a sign-out and sign-in, the
+  /// current token belongs to someone else.
+  String? renewedFrom(String? sent) {
+    final current = _ref.read(authTokenProvider);
+    return _renewed == (sent, current) ? current : null;
+  }
+
   Future<String?> renew(String expired) =>
       _running ??= _renew(expired).whenComplete(() => _running = null);
 
@@ -37,9 +48,8 @@ class TokenRefresher {
 
     final tokens = _tokens(res.data);
     if (tokens == null) return null;
-    if (_ref.read(authTokenProvider) != expired) {
-      return _ref.read(authTokenProvider);
-    }
+    // Signed out, or someone else signed in, during the refresh.
+    if (_ref.read(authTokenProvider) != expired) return null;
     await storage.saveTokens(
       token: tokens.$1,
       refreshToken: tokens.$2 ?? refreshToken,
@@ -50,8 +60,9 @@ class TokenRefresher {
     final current = _ref.read(authTokenProvider);
     if (current != expired) {
       if (current == null) await storage.clear();
-      return current;
+      return null;
     }
+    _renewed = (expired, tokens.$1);
     _ref.read(authTokenProvider.notifier).set(tokens.$1);
     return tokens.$1;
   }

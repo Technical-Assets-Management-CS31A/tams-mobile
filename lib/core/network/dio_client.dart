@@ -37,23 +37,28 @@ final dioProvider = Provider<Dio>((ref) {
           return handler.next(err);
         }
 
-        String? token = current;
-        if (options.headers['Authorization'] == 'Bearer $current') {
+        final header = options.headers['Authorization'];
+        if (header != 'Bearer $current') {
+          // Sent with an older token, or none.
+          final sent = header is String && header.startsWith('Bearer ')
+              ? header.substring('Bearer '.length)
+              : null;
+          if (refresher.renewedFrom(sent) == null) return handler.next(err);
+        } else {
+          String? token;
           try {
             token = await refresher.renew(current);
           } on DioException {
             return handler.next(err);
           } catch (e) {
             debugPrint('Could not renew the session: $e');
-            token = null;
           }
-        }
-
-        if (token == null) {
-          if (ref.read(authTokenProvider) == current) {
-            ref.read(authTokenProvider.notifier).clear();
+          if (token == null) {
+            if (ref.read(authTokenProvider) == current) {
+              ref.read(authTokenProvider.notifier).clear();
+            }
+            return handler.next(err);
           }
-          return handler.next(err);
         }
 
         options.extra[retriedKey] = true;
