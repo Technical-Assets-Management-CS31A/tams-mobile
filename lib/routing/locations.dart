@@ -5,3 +5,12 @@ String alertLoanLocation(String loanId) =>
 
 /// Loan [loanId], opened from My Loans; back returns there.
 String myLoanLocation(String loanId) => '/loans/${Uri.encodeComponent(loanId)}';
+
+String auditRoomLocation(String roomId) =>
+    '/audit/rooms/${Uri.encodeComponent(roomId)}';
+
+String auditScanLocation(String localAuditId) =>
+    '/audit/scan/${Uri.encodeComponent(localAuditId)}';
+
+String auditSummaryLocation(String localAuditId) =>
+    '/audit/summary/${Uri.encodeComponent(localAuditId)}';
