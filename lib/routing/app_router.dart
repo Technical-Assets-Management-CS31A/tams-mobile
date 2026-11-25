@@ -5,6 +5,9 @@ import 'package:go_router/go_router.dart';
 import '../features/alerts/presentation/screens/alerts_screen.dart';
 import '../features/approvals/presentation/screens/approvals_screen.dart';
 import '../features/audit/presentation/screens/audit_screen.dart';
+import '../features/audit/presentation/screens/audit_summary_screen.dart';
+import '../features/audit/presentation/screens/room_audits_screen.dart';
+import '../features/audit/presentation/screens/scanner_screen.dart';
 import '../features/auth/domain/entities/user_role.dart';
 import '../features/auth/presentation/controllers/auth_controller.dart';
 import '../features/auth/presentation/screens/login_screen.dart';
@@ -128,7 +131,31 @@ StatefulShellRoute shellRoute({GlobalKey<NavigatorState>? rootNavigatorKey}) =>
             ),
           ],
         ),
-        _tab(auditLocation, const AuditScreen()),
+        _tab(
+          auditLocation,
+          const AuditScreen(),
+          routes: [
+            GoRoute(
+              path: 'rooms/:roomId',
+              parentNavigatorKey: rootNavigatorKey,
+              builder: (_, state) =>
+                  RoomAuditsScreen(roomId: state.pathParameters['roomId']!),
+            ),
+            GoRoute(
+              path: 'scan/:localId',
+              parentNavigatorKey: rootNavigatorKey,
+              builder: (_, state) =>
+                  ScannerScreen(localAuditId: state.pathParameters['localId']!),
+            ),
+            GoRoute(
+              path: 'summary/:localId',
+              parentNavigatorKey: rootNavigatorKey,
+              builder: (_, state) => AuditSummaryScreen(
+                localAuditId: state.pathParameters['localId']!,
+              ),
+            ),
+          ],
+        ),
       ],
     );
 
