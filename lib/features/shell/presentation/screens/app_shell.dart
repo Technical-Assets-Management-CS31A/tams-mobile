@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../alerts/presentation/controllers/alerts_controller.dart';
+import '../../../audit/presentation/controllers/audit_providers.dart';
+import '../../../audit/presentation/controllers/audit_sync_controller.dart';
 import '../../../auth/domain/entities/user_role.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../../loans/presentation/controllers/loan_detail_provider.dart';
@@ -83,6 +85,7 @@ class _AppShellState extends ConsumerState<AppShell> {
         ref.read(alertsControllerProvider.notifier).refresh();
         // Statuses and countdowns moved on while the app was away.
         ref.invalidate(myLoansProvider);
+        ref.read(auditSyncControllerProvider.notifier).syncNow();
       },
     );
   }
@@ -102,6 +105,7 @@ class _AppShellState extends ConsumerState<AppShell> {
       alertsControllerProvider.select((s) => s.value?.unreadCount ?? 0),
     );
 
+    ref.listen(auditSyncControllerProvider, (_, _) {});
     final role = ref.watch(
       authControllerProvider.select((s) => s.value?.role ?? UserRole.unknown),
     );
@@ -155,10 +159,26 @@ class _AppShellState extends ConsumerState<AppShell> {
 
   Future<void> _confirmSignOut() async {
     final email = ref.read(authControllerProvider).value?.email;
-    final confirmed = await showSignOutSheet(context, email: email);
+    final unsynced = await _unsyncedScans();
+    if (!mounted) return;
+    final confirmed = await showSignOutSheet(
+      context,
+      email: email,
+      unsyncedScans: unsynced,
+    );
     if (!confirmed || !mounted) return;
     // Router redirect sends us back to /login once state is null.
     await ref.read(authControllerProvider.notifier).logout();
+  }
+
+  Future<int> _unsyncedScans() async {
+    if (ref.read(auditUserIdProvider) == null) return 0;
+    try {
+      final store = await ref.read(auditStoreProvider.future);
+      return await store.unsyncedCount();
+    } catch (_) {
+      return 0;
+    }
   }
 
   /// The Alerts icon carries the unread count.
