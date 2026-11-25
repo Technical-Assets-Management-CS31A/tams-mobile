@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../features/alerts/presentation/screens/alerts_screen.dart';
 import '../features/approvals/presentation/screens/approvals_screen.dart';
 import '../features/audit/presentation/screens/audit_screen.dart';
+import '../features/auth/domain/entities/user_role.dart';
 import '../features/auth/presentation/controllers/auth_controller.dart';
 import '../features/auth/presentation/screens/login_screen.dart';
 import '../features/loans/presentation/screens/loan_detail_screen.dart';
@@ -17,6 +18,14 @@ import 'locations.dart';
 /// Where signed-in users land: the first tab of the shell.
 const homeLocation = '/approvals';
 
+const auditLocation = '/audit';
+
+String homeFor(UserRole role) =>
+    role == UserRole.custodian ? auditLocation : homeLocation;
+
+bool isAuditLocation(String location) =>
+    location == auditLocation || location.startsWith('$auditLocation/');
+
 /// Where to send the user for [location], or null to stay there.
 /// Everyone sees /splash until the app is [ready]. After that, signed-out
 /// users can only see /login and signed-in users never see it.
@@ -24,13 +33,16 @@ String? authRedirect({
   required bool ready,
   required bool loggedIn,
   required String location,
+  UserRole role = UserRole.unknown,
 }) {
   if (!ready) return location == '/splash' ? null : '/splash';
   final atLogin = location == '/login';
   if (!loggedIn && !atLogin) return '/login';
-  if (loggedIn && (atLogin || location == '/' || location == '/splash')) {
-    return homeLocation;
+  if (!loggedIn) return null;
+  if (atLogin || location == '/' || location == '/splash') {
+    return homeFor(role);
   }
+  if (!role.canAudit && isAuditLocation(location)) return homeFor(role);
   return null;
 }
 
@@ -56,11 +68,15 @@ final routerProvider = Provider<GoRouter>((ref) {
     navigatorKey: rootNavigatorKey,
     initialLocation: '/splash',
     refreshListenable: refresh,
-    redirect: (context, state) => authRedirect(
-      ready: ref.read(appReadyProvider).hasValue,
-      loggedIn: ref.read(authControllerProvider).value != null,
-      location: state.matchedLocation,
-    ),
+    redirect: (context, state) {
+      final user = ref.read(authControllerProvider).value;
+      return authRedirect(
+        ready: ref.read(appReadyProvider).hasValue,
+        loggedIn: user != null,
+        location: state.matchedLocation,
+        role: user?.role ?? UserRole.unknown,
+      );
+    },
     routes: [
       // Never shown: authRedirect sends "/" to the tabs or /login. Registered
       // so links to "/" (e.g. go_router's error page button) resolve.
@@ -112,7 +128,7 @@ StatefulShellRoute shellRoute({GlobalKey<NavigatorState>? rootNavigatorKey}) =>
             ),
           ],
         ),
-        _tab('/audit', const AuditScreen()),
+        _tab(auditLocation, const AuditScreen()),
       ],
     );
 

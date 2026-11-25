@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:tams_mobile/features/auth/domain/entities/user_role.dart';
 import 'package:tams_mobile/routing/app_router.dart';
 
 const _tabs = ['/approvals', '/loans', '/alerts', '/audit'];
@@ -37,13 +38,80 @@ void main() {
       expect(homeLocation, _tabs.first);
       for (final location in ['/', '/splash', '/login']) {
         expect(
-          authRedirect(ready: true, loggedIn: true, location: location),
+          authRedirect(
+            ready: true,
+            loggedIn: true,
+            location: location,
+            role: UserRole.techStaff,
+          ),
           homeLocation,
         );
       }
       for (final location in _tabs) {
         expect(
-          authRedirect(ready: true, loggedIn: true, location: location),
+          authRedirect(
+            ready: true,
+            loggedIn: true,
+            location: location,
+            role: UserRole.techStaff,
+          ),
+          isNull,
+        );
+      }
+    });
+
+    test('custodians land on Audit', () {
+      for (final location in ['/', '/splash', '/login']) {
+        expect(
+          authRedirect(
+            ready: true,
+            loggedIn: true,
+            location: location,
+            role: UserRole.custodian,
+          ),
+          auditLocation,
+        );
+      }
+    });
+
+    test('instructors are sent home from Audit', () {
+      for (final role in [UserRole.instructor, UserRole.unknown]) {
+        for (final location in ['/audit', '/audit/rooms/r-1']) {
+          expect(
+            authRedirect(
+              ready: true,
+              loggedIn: true,
+              location: location,
+              role: role,
+            ),
+            homeLocation,
+          );
+        }
+        expect(
+          authRedirect(
+            ready: true,
+            loggedIn: true,
+            location: '/alerts',
+            role: role,
+          ),
+          isNull,
+        );
+      }
+    });
+
+    test('auditors can open Audit', () {
+      for (final role in [
+        UserRole.custodian,
+        UserRole.techStaff,
+        UserRole.admin,
+      ]) {
+        expect(
+          authRedirect(
+            ready: true,
+            loggedIn: true,
+            location: '/audit/rooms/r-1',
+            role: role,
+          ),
           isNull,
         );
       }
