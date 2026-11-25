@@ -76,8 +76,8 @@ void main() {
   testWidgets('lists rooms and caches them for offline use', (tester) async {
     await pumpRooms(tester);
 
-    expect(find.text('CL1 · Computer Lab 1'), findsOneWidget);
-    expect(find.text('ST1 · Storage 1'), findsOneWidget);
+    expect(find.text('Computer Lab 1'), findsOneWidget);
+    expect(find.text('Storage 1'), findsOneWidget);
     expect(find.text('Roster not downloaded'), findsNWidgets(2));
     expect((await store.cachedRooms()).map((r) => r.code), ['CL1', 'ST1']);
   });
@@ -167,8 +167,8 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
     await tester.pumpAndSettle();
 
-    expect(find.text('ST1 · Storage 1'), findsOneWidget);
-    expect(find.text('CL1 · Computer Lab 1'), findsNothing);
+    expect(find.text('Storage 1'), findsOneWidget);
+    expect(find.text('Computer Lab 1'), findsNothing);
   });
 
   testWidgets('a server that never answers times out with a retry', (
@@ -191,7 +191,7 @@ void main() {
     server.roomsAnswer = null;
     await tester.tap(find.text('Try again'));
     await tester.pumpAndSettle();
-    expect(find.text('CL1 · Computer Lab 1'), findsOneWidget);
+    expect(find.text('Computer Lab 1'), findsOneWidget);
   });
 
   testWidgets('a timeout falls back to saved rooms with a notice', (
@@ -203,7 +203,7 @@ void main() {
     await pumpRooms(tester, settle: false);
     await tester.pump(const Duration(seconds: 21));
 
-    expect(find.text('CL1 · Computer Lab 1'), findsOneWidget);
+    expect(find.text('Computer Lab 1'), findsOneWidget);
     expect(
       find.text(
         'The server took longer than 20 seconds to answer. '
