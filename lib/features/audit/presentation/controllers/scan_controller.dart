@@ -163,7 +163,13 @@ class ScanController extends AsyncNotifier<ScanSession> {
       state = AsyncData(current.showing(_already(scan)));
       return;
     }
-    state = AsyncData(current.adding(scan, _feedbackFor(scan)));
+    final feedback = _feedbackFor(scan);
+    final loaded = current.scans.any(
+      (s) => s.clientScanId == scan.clientScanId,
+    );
+    state = AsyncData(
+      loaded ? current.showing(feedback) : current.adding(scan, feedback),
+    );
     if (ref.read(isOnlineProvider)) {
       unawaited(ref.read(auditSyncControllerProvider.notifier).syncNow());
     }
