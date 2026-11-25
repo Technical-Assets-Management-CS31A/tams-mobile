@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -48,54 +50,82 @@ class AuditRoomsController extends AsyncNotifier<AuditRoomsState> {
   String _query = '';
   bool _loadingMore = false;
 
+  Duration get _limit => ref.read(auditRoomsTimeoutProvider);
+
+  String get _timedOut =>
+      'The server took longer than ${_limit.inSeconds} seconds to answer.';
+
   @override
-  Future<AuditRoomsState> build() async {
+  Future<AuditRoomsState> build() {
     final online = ref.watch(isOnlineProvider);
-    final store = await ref.watch(auditStoreProvider.future);
-    return _load(store, online, _query);
+    ref.watch(auditRoomsTimeoutProvider);
+    return _load(ref.watch(auditStoreProvider.future), online, _query);
   }
 
   Future<AuditRoomsState> _load(
-    AuditStore store,
+    Future<AuditStore> pendingStore,
     bool online,
     String query,
   ) async {
-    String? notice;
-    if (online) {
-      try {
-        final page = await ref
-            .read(auditRepositoryProvider)
-            .rooms(query: query);
-        await store.cacheRooms(page.items);
-        return AuditRoomsState(
-          rooms: page.items,
-          query: query,
-          page: page.page,
-          total: page.total,
-          reachedEnd: page.items.isEmpty,
-        );
-      } on AuditFailure catch (f) {
-        if (!f.offline) notice = f.message;
+    try {
+      final store = await pendingStore.timeout(
+        _limit,
+        onTimeout: () => throw const AuditFailure(
+          "Couldn't open the rooms saved on this phone.",
+        ),
+      );
+      String? notice;
+      if (online) {
+        try {
+          final page = await ref
+              .read(auditRepositoryProvider)
+              .rooms(query: query)
+              .timeout(_limit);
+          await store.cacheRooms(page.items);
+          return AuditRoomsState(
+            rooms: page.items,
+            query: query,
+            page: page.page,
+            total: page.total,
+            reachedEnd: page.items.isEmpty,
+          );
+        } on TimeoutException {
+          debugPrint('Rooms: gave up after ${_limit.inSeconds} s.');
+          notice = _timedOut;
+        } on AuditFailure catch (f) {
+          // The phone has a network but the server failed or is out of
+          // reach, so say why instead of quietly showing saved rooms.
+          debugPrint('Rooms: request failed (${f.code ?? '-'}): ${f.message}');
+          notice = f.message;
+        }
       }
+      final cached = await store.cachedRooms(query: query);
+      if (cached.isEmpty && notice != null) throw AuditFailure(notice);
+      return AuditRoomsState(
+        rooms: cached,
+        query: query,
+        cached: true,
+        notice: notice,
+      );
+    } on AuditFailure {
+      rethrow;
+    } catch (e, stack) {
+      debugPrint('Rooms: could not load: $e\n$stack');
+      rethrow;
     }
-    final cached = await store.cachedRooms(query: query);
-    if (cached.isEmpty && notice != null) throw AuditFailure(notice);
-    return AuditRoomsState(
-      rooms: cached,
-      query: query,
-      cached: true,
-      notice: notice,
-    );
   }
 
   Future<void> search(String query) async {
     final q = query.trim();
     _query = q;
     if (state.hasError) state = const AsyncLoading();
-    final result = await AsyncValue.guard(() async {
-      final store = await ref.read(auditStoreProvider.future);
-      return _load(store, ref.read(isOnlineProvider), q);
-    });
+    final result = await AsyncValue.guard(
+      () => _load(
+        ref.read(auditStoreProvider.future),
+        ref.read(isOnlineProvider),
+        q,
+      ),
+    );
     if (!ref.mounted || _query != q) return;
     state = result;
   }
@@ -109,7 +139,8 @@ class AuditRoomsController extends AsyncNotifier<AuditRoomsState> {
     try {
       final next = await ref
           .read(auditRepositoryProvider)
-          .rooms(query: current.query, page: current.page + 1);
+          .rooms(query: current.query, page: current.page + 1)
+          .timeout(_limit);
       final store = await ref.read(auditStoreProvider.future);
       await store.cacheRooms(next.items);
       if (ref.mounted && identical(state.value, current)) {
@@ -126,4 +157,8 @@ class AuditRoomsController extends AsyncNotifier<AuditRoomsState> {
 final auditRoomsControllerProvider =
     AsyncNotifierProvider<AuditRoomsController, AuditRoomsState>(
       AuditRoomsController.new,
+      // Riverpod would otherwise retry a failed load up to 10 times behind
+      // the error screen. The screen offers Try again, and a change in
+      // connectivity reloads the list.
+      retry: (_, _) => null,
     );

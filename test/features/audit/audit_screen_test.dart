@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -24,7 +26,11 @@ void main() {
 
   tearDown(() => database.close());
 
-  Future<GoRouter> pumpRooms(WidgetTester tester, {bool online = true}) async {
+  Future<GoRouter> pumpRooms(
+    WidgetTester tester, {
+    bool online = true,
+    bool settle = true,
+  }) async {
     if (!online) server.offline = true;
     final router = GoRouter(
       initialLocation: '/audit',
@@ -60,7 +66,7 @@ void main() {
         child: MaterialApp.router(routerConfig: router),
       ),
     );
-    await tester.pumpAndSettle();
+    if (settle) await tester.pumpAndSettle();
     return router;
   }
 
@@ -163,5 +169,58 @@ void main() {
 
     expect(find.text('ST1 · Storage 1'), findsOneWidget);
     expect(find.text('CL1 · Computer Lab 1'), findsNothing);
+  });
+
+  testWidgets('a server that never answers times out with a retry', (
+    tester,
+  ) async {
+    final hang = Completer<void>();
+    server.roomsAnswer = hang.future;
+
+    await pumpRooms(tester, settle: false);
+    await tester.pump(const Duration(seconds: 19));
+    expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+    await tester.pump(const Duration(seconds: 2));
+    expect(find.text("Couldn't load rooms"), findsOneWidget);
+    expect(
+      find.text('The server took longer than 20 seconds to answer.'),
+      findsOneWidget,
+    );
+
+    server.roomsAnswer = null;
+    await tester.tap(find.text('Try again'));
+    await tester.pumpAndSettle();
+    expect(find.text('CL1 · Computer Lab 1'), findsOneWidget);
+  });
+
+  testWidgets('a timeout falls back to saved rooms with a notice', (
+    tester,
+  ) async {
+    await store.cacheRooms([lab1]);
+    server.roomsAnswer = Completer<void>().future;
+
+    await pumpRooms(tester, settle: false);
+    await tester.pump(const Duration(seconds: 21));
+
+    expect(find.text('CL1 · Computer Lab 1'), findsOneWidget);
+    expect(
+      find.text(
+        'The server took longer than 20 seconds to answer. '
+        'Showing saved rooms.',
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('an unreachable server says so even with a network', (
+    tester,
+  ) async {
+    server.offline = true;
+
+    await pumpRooms(tester);
+
+    expect(find.text("Couldn't load rooms"), findsOneWidget);
+    expect(find.text(unreachable.message), findsOneWidget);
   });
 }
