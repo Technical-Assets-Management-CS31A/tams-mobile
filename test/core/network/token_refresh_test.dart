@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -189,6 +191,69 @@ void main() {
     expect(adapter.to('POST', '/auth/refresh'), hasLength(1));
     expect(adapter.to('GET', '/items'), hasLength(2));
   });
+
+  test('a 401 after another request renewed the token retries', () async {
+    final renewed = Completer<void>();
+    final slow = <Object?>[];
+    final adapter = RouteHttpAdapter((r) async {
+      if (r.path == '/slow') slow.add(r.headers['Authorization']);
+      if (r.path == '/auth/refresh') return refreshed(r);
+      if (r.headers['Authorization'] == 'Bearer new-token') return ok();
+      if (r.path == '/slow') await renewed.future;
+      return problem(401, 'UNAUTHORIZED');
+    });
+    final c = await signedIn(adapter);
+    c.listen(authTokenProvider, (_, next) {
+      if (next == 'new-token' && !renewed.isCompleted) renewed.complete();
+    });
+    final dio = c.read(dioProvider);
+
+    await Future.wait([dio.get('/slow'), dio.get('/fast')]);
+
+    expect(adapter.to('POST', '/auth/refresh'), hasLength(1));
+    expect(slow, ['Bearer $oldToken', 'Bearer new-token']);
+  });
+
+  test('a 401 for the previous user is not resent as the new one', () async {
+    late ProviderContainer c;
+    final adapter = RouteHttpAdapter((r) {
+      if (r.headers['Authorization'] != 'Bearer $oldToken') return ok();
+      // The user signs out and someone else signs in before the 401 lands.
+      c.read(authTokenProvider.notifier).set('other-user-token');
+      return problem(401, 'UNAUTHORIZED');
+    });
+    c = await signedIn(adapter);
+
+    await expectLater(
+      c.read(dioProvider).get('/items'),
+      throwsA(isA<DioException>()),
+    );
+
+    expect(adapter.to('GET', '/items'), hasLength(1));
+    expect(adapter.to('POST', '/auth/refresh'), isEmpty);
+    expect(c.read(authTokenProvider), 'other-user-token');
+  });
+
+  test(
+    'someone signing in during the refresh is not used for the retry',
+    () async {
+      late ProviderContainer c;
+      final adapter = RouteHttpAdapter((r) {
+        if (r.path != '/auth/refresh') return problem(401, 'UNAUTHORIZED');
+        c.read(authTokenProvider.notifier).set('other-user-token');
+        return refreshed(r);
+      });
+      c = await signedIn(adapter);
+
+      await expectLater(
+        c.read(dioProvider).get('/items'),
+        throwsA(isA<DioException>()),
+      );
+
+      expect(adapter.to('GET', '/items'), hasLength(1));
+      expect(c.read(authTokenProvider), 'other-user-token');
+    },
+  );
 
   test('an expired saved token with a refresh token is restored', () async {
     final expired = fakeJwt(DateTime.now().subtract(const Duration(hours: 1)));
