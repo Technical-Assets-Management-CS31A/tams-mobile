@@ -68,6 +68,23 @@ void main() {
     expect(await storage.readEmail(), 'a@b.com');
   });
 
+  test('a refresh without a new refresh token keeps the saved one', () async {
+    final adapter = RouteHttpAdapter(
+      (r) => switch (r.path) {
+        '/auth/refresh' => ok({'accessToken': 'new-token'}),
+        _ when r.headers['Authorization'] == 'Bearer new-token' => ok(),
+        _ => problem(401, 'UNAUTHORIZED'),
+      },
+    );
+    final c = await signedIn(adapter);
+
+    await c.read(dioProvider).get<Object?>('/items');
+
+    expect(c.read(authControllerProvider).value?.token, 'new-token');
+    expect(await storage.readToken(), 'new-token');
+    expect(await storage.readRefreshToken(), 'rt-1');
+  });
+
   test('requests failing together renew the token once', () async {
     final adapter = RouteHttpAdapter(
       (r) => switch (r.path) {

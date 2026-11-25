@@ -40,7 +40,10 @@ class TokenRefresher {
     if (_ref.read(authTokenProvider) != expired) {
       return _ref.read(authTokenProvider);
     }
-    await storage.saveTokens(token: tokens.$1, refreshToken: tokens.$2);
+    await storage.saveTokens(
+      token: tokens.$1,
+      refreshToken: tokens.$2 ?? refreshToken,
+    );
     _ref.read(authTokenProvider.notifier).set(tokens.$1);
     return tokens.$1;
   }
@@ -48,13 +51,14 @@ class TokenRefresher {
   static bool _rejected(int? status) =>
       status == 400 || status == 401 || status == 403;
 
-  static (String, String)? _tokens(Object? body) {
+  /// The new access token, and the new refresh token when the backend
+  /// rotated it. Without one, the stored refresh token stays in use.
+  static (String, String?)? _tokens(Object? body) {
     if (body is! Map) return null;
     final data = body['data'] is Map ? body['data'] as Map : body;
     final access = data['accessToken'] ?? data['token'];
     final refresh = data['refreshToken'];
     if (access is! String || access.isEmpty) return null;
-    if (refresh is! String || refresh.isEmpty) return null;
-    return (access, refresh);
+    return (access, refresh is String && refresh.isNotEmpty ? refresh : null);
   }
 }
