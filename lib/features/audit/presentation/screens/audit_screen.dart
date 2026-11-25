@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/errors/failures.dart';
 import '../../../../core/network/connectivity.dart';
+import '../../../../core/theme/brand.dart';
 import '../../../../core/utils/clock.dart';
 import '../../../../core/widgets/empty_state.dart';
 import '../../../../routing/locations.dart';
@@ -56,77 +57,73 @@ class _AuditScreenState extends ConsumerState<AuditScreen> {
     final sync = ref.watch(auditSyncControllerProvider);
     final now = ref.watch(clockProvider)();
 
-    return Column(
-      children: [
-        if (!online)
-          const OfflineBanner(
-            message:
-                "You're offline. Showing saved rooms; downloading rosters "
-                'needs a connection.',
-          )
-        else if (rooms.value?.notice case final notice?)
-          OfflineBanner(message: '$notice Showing saved rooms.'),
-        if (overview.unsynced > 0)
-          SyncBar(
-            waiting: overview.unsynced,
-            online: online,
-            syncing: sync.running,
-            onSync: () =>
-                ref.read(auditSyncControllerProvider.notifier).syncNow(),
-          ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-          child: TextField(
-            controller: _search,
-            onChanged: _onSearch,
-            textInputAction: TextInputAction.search,
-            decoration: const InputDecoration(
-              hintText: 'Search rooms',
-              prefixIcon: Icon(Icons.search),
-              border: OutlineInputBorder(),
-              isDense: true,
+    return ColoredBox(
+      color: Colors.white,
+      child: Column(
+        children: [
+          if (!online)
+            const OfflineBanner(
+              message:
+                  "You're offline. Showing saved rooms; downloading rosters "
+                  'needs a connection.',
+            )
+          else if (rooms.value?.notice case final notice?)
+            OfflineBanner(message: '$notice Showing saved rooms.'),
+          if (overview.unsynced > 0)
+            SyncBar(
+              waiting: overview.unsynced,
+              online: online,
+              syncing: sync.running,
+              onSync: () =>
+                  ref.read(auditSyncControllerProvider.notifier).syncNow(),
             ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+            child: _SearchField(controller: _search, onChanged: _onSearch),
           ),
-        ),
-        Expanded(
-          child: switch (rooms) {
-            AsyncValue(:final value?) => RefreshIndicator(
-              onRefresh: _refresh,
-              child: value.rooms.isEmpty
-                  ? _FillScrollable(
-                      child: EmptyState(
-                        icon: Icons.meeting_room_outlined,
-                        title: value.query.isEmpty
-                            ? 'No rooms yet'
-                            : 'No rooms match "${value.query}"',
-                        message: value.cached
-                            ? 'Rooms you have opened while online are saved '
-                                  'here for offline audits.'
-                            : 'Rooms set up by staff will appear here.',
-                      ),
-                    )
-                  : _list(value, overview, online, now),
-            ),
-            AsyncValue(:final error?) => RefreshIndicator(
-              onRefresh: _refresh,
-              child: _FillScrollable(
-                child: EmptyState(
-                  icon: Icons.cloud_off_outlined,
-                  title: "Couldn't load rooms",
-                  message: error is Failure
-                      ? error.message
-                      : 'Something went wrong. Please try again.',
-                  action: FilledButton.tonal(
-                    onPressed: _refresh,
-                    child: const Text('Try again'),
+          Expanded(
+            child: switch (rooms) {
+              AsyncValue(:final value?) => RefreshIndicator(
+                onRefresh: _refresh,
+                child: value.rooms.isEmpty
+                    ? _FillScrollable(
+                        child: EmptyState(
+                          icon: Icons.meeting_room_outlined,
+                          title: value.query.isEmpty
+                              ? 'No rooms yet'
+                              : 'No rooms match "${value.query}"',
+                          message: value.cached
+                              ? 'Rooms you have opened while online are saved '
+                                    'here for offline audits.'
+                              : 'Rooms set up by staff will appear here.',
+                        ),
+                      )
+                    : _list(value, overview, online, now),
+              ),
+              AsyncValue(:final error?) => RefreshIndicator(
+                onRefresh: _refresh,
+                child: _FillScrollable(
+                  child: EmptyState(
+                    icon: Icons.cloud_off_outlined,
+                    title: "Couldn't load rooms",
+                    message: error is Failure
+                        ? error.message
+                        : 'Something went wrong. Please try again.',
+                    action: FilledButton(
+                      onPressed: _refresh,
+                      style: BrandButtons.primary(),
+                      child: const Text('Try again'),
+                    ),
                   ),
                 ),
               ),
-            ),
-            _ => const Center(child: CircularProgressIndicator()),
-          },
-        ),
-      ],
+              _ => const Center(
+                child: CircularProgressIndicator(color: BrandColors.primary),
+              ),
+            },
+          ),
+        ],
+      ),
     );
   }
 
@@ -144,9 +141,9 @@ class _AuditScreenState extends ConsumerState<AuditScreen> {
     final rooms = state.rooms;
     return ListView.separated(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       itemCount: rooms.length + (state.hasMore ? 1 : 0),
-      separatorBuilder: (_, _) => const SizedBox(height: 10),
+      separatorBuilder: (_, _) => const SizedBox(height: 12),
       itemBuilder: (context, i) {
         if (i == rooms.length) {
           WidgetsBinding.instance.addPostFrameCallback(
@@ -154,7 +151,9 @@ class _AuditScreenState extends ConsumerState<AuditScreen> {
           );
           return const Padding(
             padding: EdgeInsets.symmetric(vertical: 16),
-            child: Center(child: CircularProgressIndicator()),
+            child: Center(
+              child: CircularProgressIndicator(color: BrandColors.primary),
+            ),
           );
         }
         final room = rooms[i];
@@ -255,4 +254,43 @@ class _FillScrollable extends StatelessWidget {
       child: SizedBox(height: constraints.maxHeight, child: child),
     ),
   );
+}
+
+/// Grey filled search box matching the login screen's fields.
+class _SearchField extends StatelessWidget {
+  const _SearchField({required this.controller, required this.onChanged});
+
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    OutlineInputBorder border(Color c, [double w = 1.5]) => OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: w == 0 ? BorderSide.none : BorderSide(color: c, width: w),
+    );
+
+    return TextField(
+      controller: controller,
+      onChanged: onChanged,
+      textInputAction: TextInputAction.search,
+      cursorColor: BrandColors.primary,
+      style: brandText(15, weight: FontWeight.w500),
+      decoration: InputDecoration(
+        hintText: 'Search rooms',
+        hintStyle: brandText(15, color: BrandColors.faint),
+        filled: true,
+        fillColor: BrandColors.field,
+        prefixIcon: const Icon(
+          Icons.search_rounded,
+          size: 20,
+          color: BrandColors.faint,
+        ),
+        contentPadding: const EdgeInsets.symmetric(vertical: 14),
+        border: border(Colors.transparent, 0),
+        enabledBorder: border(Colors.transparent, 0),
+        focusedBorder: border(BrandColors.primary),
+      ),
+    );
+  }
 }

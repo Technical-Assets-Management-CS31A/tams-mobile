@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/errors/failures.dart';
 import '../../../../core/network/connectivity.dart';
+import '../../../../core/widgets/brand_app_bar.dart';
 import '../../../../core/widgets/empty_state.dart';
 import '../../domain/entities/audit.dart';
 import '../../domain/entities/audit_failure.dart';
@@ -35,12 +36,11 @@ class _AuditSummaryScreenState extends ConsumerState<AuditSummaryScreen> {
     final online = ref.watch(isOnlineProvider);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(
-          session.value == null
-              ? 'Summary'
-              : '${session.value!.roster.room.code} summary',
-        ),
+      appBar: brandAppBar(
+        context,
+        title: session.value == null
+            ? 'Summary'
+            : '${session.value!.roster.room.code} summary',
         actions: [ConnectionChip(online: online)],
       ),
       body: switch (session) {
