@@ -63,15 +63,23 @@ class _AuditSummaryScreenState extends ConsumerState<AuditSummaryScreen> {
       return _CompletedView(
         detail: completed,
         roster: session.roster,
-        onSignedOff: (audit) => setState(
-          () => _completed = AuditDetail(audit: audit, items: completed.items),
-        ),
+        onSignedOff: (audit) {
+          setState(
+            () =>
+                _completed = AuditDetail(audit: audit, items: completed.items),
+          );
+          _saveSignOff(session.audit.localId);
+        },
       );
     }
     final audit = session.audit;
     if (audit.status == AuditStatus.completed ||
         audit.status == AuditStatus.signedOff) {
-      return _StoredCompleted(audit: audit, roster: session.roster);
+      return _StoredCompleted(
+        audit: audit,
+        roster: session.roster,
+        onSignedOff: (_) => _saveSignOff(audit.localId),
+      );
     }
     return Column(
       children: [
@@ -271,6 +279,19 @@ class _AuditSummaryScreenState extends ConsumerState<AuditSummaryScreen> {
     }
   }
 
+  /// Keeps the sign-off on this phone, so the audit shows as signed off
+  /// here and when it's opened again.
+  Future<void> _saveSignOff(String localId) async {
+    final revision = ref.read(auditRevisionProvider.notifier);
+    try {
+      final store = await ref.read(auditStoreProvider.future);
+      await store.markSignedOff(localId);
+      revision.bump();
+    } catch (e) {
+      debugPrint("Couldn't save the sign-off on this phone: $e");
+    }
+  }
+
   void _say(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
@@ -412,10 +433,15 @@ class _CompletedView extends StatelessWidget {
 }
 
 class _StoredCompleted extends StatelessWidget {
-  const _StoredCompleted({required this.audit, required this.roster});
+  const _StoredCompleted({
+    required this.audit,
+    required this.roster,
+    this.onSignedOff,
+  });
 
   final LocalAudit audit;
   final Roster roster;
+  final ValueChanged<ServerAudit>? onSignedOff;
 
   @override
   Widget build(BuildContext context) {
@@ -439,6 +465,7 @@ class _StoredCompleted extends StatelessWidget {
               auditId: serverId,
               roomCode: roster.room.code,
               status: audit.status,
+              onSignedOff: onSignedOff,
             ),
           ),
       ],

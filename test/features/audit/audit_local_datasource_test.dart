@@ -136,6 +136,30 @@ void main() {
       expect(await mine.openAuditFor(lab1.id), isNull);
     });
 
+    test('only a submitted audit can be signed off', () async {
+      await mine.insertAudit(openAudit());
+
+      await mine.markSignedOff('local-1');
+      expect((await mine.audit('local-1'))!.status, AuditStatus.inProgress);
+
+      await mine.completeAudit(
+        'local-1',
+        counts: const AuditCounts(
+          expected: 1,
+          matched: 1,
+          missing: 0,
+          misplaced: 0,
+          unknown: 0,
+        ),
+        completedAt: DateTime.utc(2026, 11, 25, 4),
+      );
+      await mine.markSignedOff('local-1');
+
+      final done = (await mine.audit('local-1'))!;
+      expect(done.status, AuditStatus.signedOff);
+      expect(done.counts!.matched, 1);
+    });
+
     test('an audit ended elsewhere is no longer open', () async {
       await mine.insertAudit(openAudit());
       await mine.markEndedElsewhere('local-1');

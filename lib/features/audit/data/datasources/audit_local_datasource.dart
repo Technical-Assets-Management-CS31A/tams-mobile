@@ -242,6 +242,14 @@ class AuditLocalDataSource implements AuditStore {
   });
 
   @override
+  Future<void> markSignedOff(String localId) => _db.update(
+    'audits',
+    {'status': AuditStatus.signedOff.label},
+    where: 'user_id = ? AND local_id = ? AND status = ?',
+    whereArgs: [userId, localId, AuditStatus.completed.label],
+  );
+
+  @override
   Future<void> deleteAudit(String localId) => _db.delete(
     'audits',
     where: 'user_id = ? AND local_id = ?',
