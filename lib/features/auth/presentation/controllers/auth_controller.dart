@@ -9,6 +9,7 @@ import '../../../../core/network/token_provider.dart';
 import '../../../../core/storage/token_storage.dart';
 import '../../../../core/utils/jwt.dart';
 import '../../domain/entities/user.dart';
+import '../../domain/entities/user_role.dart';
 import '../../domain/repositories/auth_repository.dart';
 import '../../domain/usecases/login_usecase.dart';
 
@@ -50,12 +51,18 @@ class AuthController extends AsyncNotifier<User?> {
     try {
       final token = await storage.readToken();
       final email = await storage.readEmail();
+      final claims = token == null ? null : jwtClaims(token);
+      final role = UserRole.fromClaim(await storage.readRole());
       saved = (token == null || email == null)
           ? null
           : User(
               email: email,
               token: token,
               refreshToken: await storage.readRefreshToken(),
+              id: await storage.readUserId() ?? _string(claims?['sub']),
+              role: role == UserRole.unknown
+                  ? UserRole.fromClaim(claims?['role'])
+                  : role,
             );
     } catch (e) {
       // e.g. Android keystore reset after a backup restore: the saved
@@ -88,6 +95,8 @@ class AuthController extends AsyncNotifier<User?> {
               token: user.token,
               email: user.email,
               refreshToken: user.refreshToken,
+              userId: user.id,
+              role: user.role == UserRole.unknown ? null : user.role.claim,
             );
       } catch (e) {
         // e.g. a keystore error on Android or Keychain error on iOS. Remove any
@@ -114,6 +123,9 @@ class AuthController extends AsyncNotifier<User?> {
     state = const AsyncData(null);
     await _clearStorage();
   }
+
+  static String? _string(Object? value) =>
+      value is String && value.isNotEmpty ? value : null;
 
   /// Best effort: a storage error must never keep the user signed in.
   Future<void> _clearStorage() async {

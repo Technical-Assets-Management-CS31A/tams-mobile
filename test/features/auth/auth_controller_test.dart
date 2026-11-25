@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tams_mobile/core/network/dio_client.dart';
 import 'package:tams_mobile/core/network/token_provider.dart';
 import 'package:tams_mobile/core/storage/token_storage.dart';
+import 'package:tams_mobile/features/auth/domain/entities/user_role.dart';
 import 'package:tams_mobile/features/auth/presentation/controllers/auth_controller.dart';
 
 import '../../helpers/fake_http_adapter.dart';
@@ -32,9 +33,17 @@ class _BrokenStorage extends TokenStorage {
     required String token,
     required String email,
     String? refreshToken,
+    String? userId,
+    String? role,
   }) async {
     if (failSave) throw PlatformException(code: 'KeyStoreException');
-    return super.save(token: token, email: email, refreshToken: refreshToken);
+    return super.save(
+      token: token,
+      email: email,
+      refreshToken: refreshToken,
+      userId: userId,
+      role: role,
+    );
   }
 
   @override
@@ -96,6 +105,38 @@ void main() {
       expect(c.read(authTokenProvider), token);
     });
 
+    test('restores the saved user id and role', () async {
+      FlutterSecureStorage.setMockInitialValues({
+        'auth_token': fakeJwt(DateTime.now().add(const Duration(minutes: 10))),
+        'auth_email': 'a@b.com',
+        'auth_user_id': 'user-9',
+        'auth_role': 'TECH_STAFF',
+      });
+      final c = makeContainer(FakeHttpAdapter());
+
+      final user = await c.read(authControllerProvider.future);
+      expect(user?.id, 'user-9');
+      expect(user?.role, UserRole.techStaff);
+    });
+
+    test(
+      'a session saved without them reads sub and role from the JWT',
+      () async {
+        FlutterSecureStorage.setMockInitialValues({
+          'auth_token': fakeJwt(
+            DateTime.now().add(const Duration(minutes: 10)),
+            role: 'CUSTODIAN',
+          ),
+          'auth_email': 'a@b.com',
+        });
+        final c = makeContainer(FakeHttpAdapter());
+
+        final user = await c.read(authControllerProvider.future);
+        expect(user?.id, 'user-1');
+        expect(user?.role, UserRole.custodian);
+      },
+    );
+
     test('an expired token is not restored and is cleared', () async {
       FlutterSecureStorage.setMockInitialValues({
         'auth_token': fakeJwt(
@@ -135,6 +176,21 @@ void main() {
       expect(c.read(authTokenProvider), 'jwt-3');
       expect(await storage.readToken(), 'jwt-3');
       expect(await storage.readRefreshToken(), 'refresh-token');
+    });
+
+    test('saves the user id and role with the session', () async {
+      final c = makeContainer(
+        FakeHttpAdapter(body: loginResponse(role: 'CUSTODIAN')),
+      );
+      await c.read(authControllerProvider.future);
+
+      await c.read(authControllerProvider.notifier).login('a@b.com', 'pw');
+
+      final user = c.read(authControllerProvider).value;
+      expect(user?.id, loginUserId);
+      expect(user?.role, UserRole.custodian);
+      expect(await storage.readUserId(), loginUserId);
+      expect(await storage.readRole(), 'CUSTODIAN');
     });
 
     test('invalid credentials set an error and stay logged out', () async {
