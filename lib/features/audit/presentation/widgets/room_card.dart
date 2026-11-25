@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/theme/brand.dart';
 import '../../../../core/utils/time_format.dart';
 import '../../domain/entities/audit.dart';
 import '../../domain/entities/audit_room.dart';
 import '../../domain/entities/roster.dart';
 
+/// One room on the Audit tab, in the login screen's flat style: a
+/// hairline-bordered white card with the room, its roster state, and the
+/// download and start buttons side by side.
 class RoomCard extends StatelessWidget {
   const RoomCard({
     super.key,
@@ -31,131 +35,112 @@ class RoomCard extends StatelessWidget {
   final VoidCallback? onStart;
   final VoidCallback? onDiscard;
 
+  static final _radius = BorderRadius.circular(16);
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final muted = theme.textTheme.bodySmall?.copyWith(
-      color: colors.onSurfaceVariant,
-    );
     final roster = this.roster;
     final audit = this.audit;
     final open = audit?.isOpen ?? false;
     final endedElsewhere = audit?.status == AuditStatus.endedElsewhere;
     final canStart = open || online || roster != null;
 
-    return Card(
-      margin: EdgeInsets.zero,
+    return Material(
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: _radius,
+        side: BorderSide(
+          color: open
+              ? BrandColors.primary.withValues(alpha: 0.35)
+              : BrandColors.line,
+        ),
+      ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onOpen,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 12, 8),
+          padding: const EdgeInsets.all(16),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  _RoomIcon(storage: room.isStorage, active: open),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           room.label,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: brandText(
+                            16,
+                            weight: FontWeight.w600,
+                            ls: -0.3,
                           ),
                         ),
-                        if (room.place.isNotEmpty)
-                          Text(room.place, style: muted),
+                        if (room.place.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            room.place,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: brandText(13, color: BrandColors.muted),
+                          ),
+                        ],
                       ],
                     ),
                   ),
                   if (open)
-                    _Tag(
-                      'In progress',
-                      bg: colors.tertiaryContainer,
-                      fg: colors.onTertiaryContainer,
+                    const Padding(
+                      padding: EdgeInsets.only(left: 8),
+                      child: BrandPill('In progress'),
                     )
                   else if (endedElsewhere)
-                    _Tag(
-                      'Completed elsewhere',
-                      bg: colors.errorContainer,
-                      fg: colors.onErrorContainer,
+                    const Padding(
+                      padding: EdgeInsets.only(left: 8),
+                      child: BrandPill(
+                        'Completed elsewhere',
+                        color: BrandColors.error,
+                        background: BrandColors.errorBg,
+                      ),
                     ),
                 ],
               ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Icon(
-                    roster == null
-                        ? Icons.cloud_download_outlined
-                        : Icons.offline_pin_outlined,
-                    size: 16,
-                    color: colors.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      roster == null
-                          ? 'Roster not downloaded'
-                          : '${_items(roster.itemCount)} · downloaded '
-                                '${formatAge(roster.downloadedAt, now: now)}',
-                      style: muted,
-                    ),
-                  ),
-                ],
-              ),
+              const SizedBox(height: 14),
+              _RosterLine(roster: roster, now: now),
               if (!canStart) ...[
-                const SizedBox(height: 4),
-                Text(
+                const SizedBox(height: 10),
+                const _Warning(
                   'Download the roster while online to audit this room '
                   'offline.',
-                  style: muted?.copyWith(color: colors.error),
                 ),
               ],
-              const SizedBox(height: 4),
+              const SizedBox(height: 14),
               Row(
                 children: [
-                  TextButton.icon(
-                    key: Key('download-${room.id}'),
-                    onPressed: online && !busy ? onDownload : null,
-                    icon: Icon(
-                      roster == null ? Icons.download : Icons.refresh,
-                      size: 18,
-                    ),
-                    label: Text(
-                      roster == null ? 'Download roster' : 'Download again',
-                    ),
-                  ),
-                  const Spacer(),
-                  if (busy)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 16),
-                      child: SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    )
-                  else if (endedElsewhere)
-                    OutlinedButton(
-                      key: Key('discard-${room.id}'),
-                      onPressed: onDiscard,
-                      child: const Text('Discard'),
-                    )
-                  else
-                    FilledButton.icon(
-                      key: Key('start-${room.id}'),
-                      onPressed: canStart ? onStart : null,
+                  Expanded(
+                    child: TextButton.icon(
+                      key: Key('download-${room.id}'),
+                      onPressed: online && !busy ? onDownload : null,
+                      style: BrandButtons.subtle(),
                       icon: Icon(
-                        open ? Icons.play_arrow : Icons.qr_code_scanner,
+                        roster == null
+                            ? Icons.download_rounded
+                            : Icons.refresh_rounded,
                         size: 18,
                       ),
-                      label: Text(open ? 'Resume' : 'Start'),
+                      label: Text(
+                        roster == null ? 'Download roster' : 'Download again',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(child: _mainAction(open, endedElsewhere, canStart)),
                 ],
               ),
             ],
@@ -165,26 +150,133 @@ class RoomCard extends StatelessWidget {
     );
   }
 
-  static String _items(int n) => n == 1 ? '1 item' : '$n items';
+  Widget _mainAction(bool open, bool endedElsewhere, bool canStart) {
+    if (busy) {
+      return const SizedBox(
+        height: 44,
+        child: Center(
+          child: SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(
+              strokeWidth: 2.2,
+              color: BrandColors.primary,
+            ),
+          ),
+        ),
+      );
+    }
+    if (endedElsewhere) {
+      return OutlinedButton(
+        key: Key('discard-${room.id}'),
+        onPressed: onDiscard,
+        style: BrandButtons.danger(),
+        child: const Text('Discard'),
+      );
+    }
+    return FilledButton.icon(
+      key: Key('start-${room.id}'),
+      onPressed: canStart ? onStart : null,
+      style: BrandButtons.primary(),
+      icon: Icon(
+        open ? Icons.play_arrow_rounded : Icons.qr_code_scanner_rounded,
+        size: 18,
+      ),
+      label: Text(open ? 'Resume' : 'Start'),
+    );
+  }
 }
 
-class _Tag extends StatelessWidget {
-  const _Tag(this.text, {required this.bg, required this.fg});
+class _RoomIcon extends StatelessWidget {
+  const _RoomIcon({required this.storage, required this.active});
 
-  final String text;
-  final Color bg;
-  final Color fg;
+  final bool storage;
+  final bool active;
 
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+    width: 44,
+    height: 44,
     decoration: BoxDecoration(
-      color: bg,
-      borderRadius: BorderRadius.circular(999),
+      color: active
+          ? BrandColors.primary
+          : BrandColors.primary.withValues(alpha: 0.08),
+      borderRadius: BorderRadius.circular(12),
     ),
-    child: Text(
-      text,
-      style: TextStyle(color: fg, fontWeight: FontWeight.w600, fontSize: 12),
+    child: Icon(
+      storage ? Icons.inventory_2_outlined : Icons.meeting_room_outlined,
+      size: 22,
+      color: active ? Colors.white : BrandColors.primary,
+    ),
+  );
+}
+
+/// Whether the room's roster is on this phone, and how fresh it is.
+class _RosterLine extends StatelessWidget {
+  const _RosterLine({required this.roster, required this.now});
+
+  final RosterInfo? roster;
+  final DateTime now;
+
+  @override
+  Widget build(BuildContext context) {
+    final roster = this.roster;
+    final saved = roster != null;
+    return Row(
+      children: [
+        Icon(
+          saved ? Icons.offline_pin_rounded : Icons.cloud_download_outlined,
+          size: 16,
+          color: saved ? BrandColors.success : BrandColors.faint,
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            saved
+                ? '${_items(roster.itemCount)} · downloaded '
+                      '${formatAge(roster.downloadedAt, now: now)}'
+                : 'Roster not downloaded',
+            style: brandText(13, color: BrandColors.muted),
+          ),
+        ),
+      ],
+    );
+  }
+
+  static String _items(int n) => n == 1 ? '1 item' : '$n items';
+}
+
+class _Warning extends StatelessWidget {
+  const _Warning(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+    decoration: BoxDecoration(
+      color: BrandColors.errorBg,
+      borderRadius: BorderRadius.circular(10),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Icon(
+          Icons.error_outline_rounded,
+          size: 16,
+          color: BrandColors.error,
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: brandText(
+              12.5,
+              color: BrandColors.error,
+            ).copyWith(height: 1.4),
+          ),
+        ),
+      ],
     ),
   );
 }
