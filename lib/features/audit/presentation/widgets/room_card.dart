@@ -71,23 +71,25 @@ class RoomCard extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // The code as the header and the name under it,
+                        // such as STORE-1 over Equipment Storage. Both wrap
+                        // rather than cut off.
                         Text(
-                          room.label,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          room.code,
                           style: brandText(
                             16,
                             weight: FontWeight.w600,
                             ls: -0.3,
-                          ),
+                          ).copyWith(height: 1.3),
                         ),
-                        if (room.place.isNotEmpty) ...[
+                        if (room.name.isNotEmpty && room.name != room.code) ...[
                           const SizedBox(height: 2),
                           Text(
-                            room.place,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: brandText(13, color: BrandColors.muted),
+                            room.name,
+                            style: brandText(
+                              13,
+                              color: BrandColors.muted,
+                            ).copyWith(height: 1.35),
                           ),
                         ],
                       ],
