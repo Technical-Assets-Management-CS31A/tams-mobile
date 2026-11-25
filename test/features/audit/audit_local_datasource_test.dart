@@ -45,6 +45,18 @@ void main() {
 
       expect((await mine.cachedRooms()).single.name, 'Computer Lab One');
     });
+
+    test('search treats % and _ as plain text', () async {
+      await mine.cacheRooms([
+        const AuditRoom(id: 'r-1', code: 'LAB_1', name: 'Lab'),
+        const AuditRoom(id: 'r-2', code: 'LAB-1', name: 'Lab'),
+        const AuditRoom(id: 'r-3', code: 'LABX1', name: '100% full'),
+      ]);
+
+      expect((await mine.cachedRooms(query: 'LAB_1')).single.id, 'r-1');
+      expect((await mine.cachedRooms(query: '%')).single.id, 'r-3');
+      expect(await mine.cachedRooms(query: r'\'), isEmpty);
+    });
   });
 
   group('rosters', () {

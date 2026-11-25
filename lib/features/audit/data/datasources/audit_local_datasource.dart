@@ -37,14 +37,15 @@ class AuditLocalDataSource implements AuditStore {
   @override
   Future<List<AuditRoom>> cachedRooms({String query = ''}) async {
     final q = query.trim();
+    // Match the typed text literally: `%` and `_` are LIKE wildcards.
+    final pattern =
+        '%${q.replaceAllMapped(RegExp(r'[\\%_]'), (m) => '\\${m[0]}')}%';
     final rows = await _db.query(
       'rooms',
-      where: q.isEmpty
-          ? 'user_id = ?'
-          : 'user_id = ? AND (code LIKE ? OR name LIKE ?)',
+      where: q.isEmpty ? 'user_id = ?' : r"user_id = ? AND (code LIKE ? ESCAPE '\' OR name LIKE ? ESCAPE '\')",
       whereArgs: [
         userId,
-        if (q.isNotEmpty) ...['%$q%', '%$q%'],
+        if (q.isNotEmpty) ...[pattern, pattern],
       ],
       orderBy: 'code COLLATE NOCASE',
     );
