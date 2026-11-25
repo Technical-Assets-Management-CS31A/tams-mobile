@@ -32,97 +32,97 @@ Builds the Audit tab from [mobile-phase-plan.md](mobile-phase-plan.md) Phase 4 (
 
 An offline audit easily runs past the 15-minute access token. Today the first sync after reconnecting gets a 401 and signs the user out.
 
-- [ ] Renew the token with `POST /auth/refresh {refreshToken}` on a 401, then retry the request (Phase 1 item, NFR-9)
-- [ ] Sign out only if the refresh fails
+- [x] Renew the token with `POST /auth/refresh {refreshToken}` on a 401, then retry the request (Phase 1 item, NFR-9)
+- [x] Sign out only if the refresh fails
 
 ## 1. Groundwork
 
-- [ ] Add the packages listed above
-- [ ] Add `id` and `role` to `User`, parsed from the login body and saved with the session
-- [ ] Sessions saved before this change read `role` and `sub` from the JWT
-- [ ] Hide the Audit tab from instructors; `/audit` redirects them home
-- [ ] Custodians land on Audit after signing in
-- [ ] Change the Audit tab's subtitle to "Room inventory checks" and its icon to a QR icon
-- [ ] Add the camera permission text: iOS `NSCameraUsageDescription`, Android manifest
+- [x] Add the packages listed above
+- [x] Add `id` and `role` to `User`, parsed from the login body and saved with the session
+- [x] Sessions saved before this change read `role` and `sub` from the JWT
+- [x] Hide the Audit tab from instructors; `/audit` redirects them home
+- [x] Custodians land on Audit after signing in
+- [x] Change the Audit tab's subtitle to "Room inventory checks" and its icon to a QR icon
+- [x] Add the camera permission text: iOS `NSCameraUsageDescription`, Android manifest
 
 ## 2. Local database
 
-- [ ] `AuditDatabase` (sqflite), schema version 1, with an `onUpgrade` hook
-- [ ] `rooms` table: cached room list
-- [ ] `roster_items` table: `room_id`, `asset_id`, code, name, category, `downloaded_at`
-- [ ] `audits` table: `local_id`, `server_id` (null until created), `room_id`, `user_id`, status, timestamps
-- [ ] `scans` table: `client_scan_id` (PK), `local_audit_id`, `scanned_value`, `scanned_at`, `local_result`, `server_result`, asset code and name, `synced_at`
-- [ ] Every query is filtered by the signed-in user's ID
-- [ ] DAO tests on an in-memory database (`sqflite_common_ffi`)
+- [x] `AuditDatabase` (sqflite), schema version 1, with an `onUpgrade` hook
+- [x] `rooms` table: cached room list
+- [x] `roster_items` table: `room_id`, `asset_id`, code, name, category, `downloaded_at`
+- [x] `audits` table: `local_id`, `server_id` (null until created), `room_id`, `user_id`, status, timestamps
+- [x] `scans` table: `client_scan_id` (PK), `local_audit_id`, `scanned_value`, `scanned_at`, `local_result`, `server_result`, asset code and name, `synced_at`
+- [x] Every query is filtered by the signed-in user's ID
+- [x] DAO tests on an in-memory database (`sqflite_common_ffi`)
 
 ## 3. Rooms and rosters
 
-- [ ] Room list from `GET /rooms` with search and paging, cached for offline use
-- [ ] "Download roster" per room (`GET /rooms/{id}/roster`) shows the item count and when it was downloaded
-- [ ] "Download again" refreshes a roster
-- [ ] Offline: show cached rooms, disable downloads and show why
-- [ ] A room with an open audit shows "Resume" instead of "Start"
+- [x] Room list from `GET /rooms` with search and paging, cached for offline use
+- [x] "Download roster" per room (`GET /rooms/{id}/roster`) shows the item count and when it was downloaded
+- [x] "Download again" refreshes a roster
+- [x] Offline: show cached rooms, disable downloads and show why
+- [x] A room with an open audit shows "Resume" instead of "Start"
 
 ## 4. Start and resume
 
-- [ ] Start online: `POST /audits`, then save the server ID and the returned roster
-- [ ] Start offline: create a local audit with no server ID (needs a downloaded roster)
-- [ ] On reconnect: reuse an `IN_PROGRESS` audit I started for that room if one exists, otherwise `POST /audits`
-- [ ] Save `server_id` as soon as it's known, so a retry never creates a second audit
-- [ ] One open audit per room per phone
+- [x] Start online: `POST /audits`, then save the server ID and the returned roster
+- [x] Start offline: create a local audit with no server ID (needs a downloaded roster)
+- [x] On reconnect: reuse an `IN_PROGRESS` audit I started for that room if one exists, otherwise `POST /audits`
+- [x] Save `server_id` as soon as it's known, so a retry never creates a second audit
+- [x] One open audit per room per phone
 
 ## 5. Scanner
 
-- [ ] `mobile_scanner` camera screen with a torch toggle
-- [ ] Parse `tams:asset:<uuid>` or a bare UUID; any other text is unknown
-- [ ] Local result: on the roster = matched, valid UUID not on the roster = pending, anything else = unknown
-- [ ] Save the scan with a new `client_scan_id` (UUID v4) and the phone's scan time before showing feedback
-- [ ] Coloured banner and a haptic tap per result, with the asset code and name
-- [ ] Ignore the same value seen again within 2 s (the camera reports a code many times)
-- [ ] Same asset scanned again in this audit shows "Already scanned"
-- [ ] Progress: "X of Y found", plus counts of pending and unknown scans
-- [ ] Offline queue counter ("N waiting to sync") and an online/offline indicator
-- [ ] Camera permission denied: show a message with an "Open settings" button
+- [x] `mobile_scanner` camera screen with a torch toggle
+- [x] Parse `tams:asset:<uuid>` or a bare UUID; any other text is unknown
+- [x] Local result: on the roster = matched, valid UUID not on the roster = pending, anything else = unknown
+- [x] Save the scan with a new `client_scan_id` (UUID v4) and the phone's scan time before showing feedback
+- [x] Coloured banner and a haptic tap per result, with the asset code and name
+- [x] Ignore the same value seen again within 2 s (the camera reports a code many times)
+- [x] Same asset scanned again in this audit shows "Already scanned"
+- [x] Progress: "X of Y found", plus counts of pending and unknown scans
+- [x] Offline queue counter ("N waiting to sync") and an online/offline indicator
+- [x] Camera permission denied: show a message with an "Open settings" button
 
 ## 6. Sync
 
-- [ ] `AuditSyncService` runs one sync at a time
-- [ ] Create the server audit first if needed, then send unsynced scans in batches of 500
-- [ ] Mark a scan synced only when its `clientScanId` comes back in `results`
-- [ ] Store the server's result, asset code and name; pending scans become misplaced or unknown
-- [ ] Sync after each scan when online, when the connection returns, when the app resumes, and from a "Sync now" button
-- [ ] Network error: keep the queue and retry on the next trigger
-- [ ] 409 `SYNC_IN_PROGRESS`: retry after a short delay
-- [ ] 409 `AUDIT_NOT_IN_PROGRESS`: stop syncing and say the audit was completed elsewhere
+- [x] `AuditSyncService` runs one sync at a time
+- [x] Create the server audit first if needed, then send unsynced scans in batches of 500
+- [x] Mark a scan synced only when its `clientScanId` comes back in `results`
+- [x] Store the server's result, asset code and name; pending scans become misplaced or unknown
+- [x] Sync after each scan when online, when the connection returns, when the app resumes, and from a "Sync now" button
+- [x] Network error: keep the queue and retry on the next trigger
+- [x] 409 `SYNC_IN_PROGRESS`: retry after a short delay
+- [x] 409 `AUDIT_NOT_IN_PROGRESS`: stop syncing and say the audit was completed elsewhere
 
 ## 7. Summary and submit
 
-- [ ] Summary lists matched, misplaced, unknown and missing items (roster items not scanned) (FR-7.5)
-- [ ] Missing items that the roster shows as on loan get an "On loan" tag, so they aren't mistaken for lost ones
-- [ ] Submit works only when online with 0 unsynced scans; otherwise explain why
-- [ ] Confirmation sheet before submitting shows the missing count
-- [ ] `POST /audits/{id}/complete`; the server's counts and missing list replace the local ones
-- [ ] A completed audit is read-only; its local scans are cleared once the server confirms
+- [x] Summary lists matched, misplaced, unknown and missing items (roster items not scanned) (FR-7.5)
+- [x] Missing items that the roster shows as on loan get an "On loan" tag, so they aren't mistaken for lost ones
+- [x] Submit works only when online with 0 unsynced scans; otherwise explain why
+- [x] Confirmation sheet before submitting shows the missing count
+- [x] `POST /audits/{id}/complete`; the server's counts and missing list replace the local ones
+- [x] A completed audit is read-only; its local scans are cleared once the server confirms
 
 ## 8. Report and sign-off
 
-- [ ] Download the PDF with Dio (auth header) to the temp folder
-- [ ] Open it (`open_filex`) or share it (`share_plus`) (US-14)
-- [ ] Each room shows its recent completed audits (`GET /audits?roomId=`) so a report can be opened again
-- [ ] Sign off button on `COMPLETED` audits for TECH_STAFF and ADMIN (`POST /audits/{id}/sign-off`)
+- [x] Download the PDF with Dio (auth header) to the temp folder
+- [x] Open it (`open_filex`) or share it (`share_plus`) (US-14)
+- [x] Each room shows its recent completed audits (`GET /audits?roomId=`) so a report can be opened again
+- [x] Sign off button on `COMPLETED` audits for TECH_STAFF and ADMIN (`POST /audits/{id}/sign-off`)
 
 ## 9. Sign-out safety
 
-- [ ] The sign-out sheet warns when scans haven't synced yet
-- [ ] Unsynced scans stay on the phone for that user and sync at their next sign-in
+- [x] The sign-out sheet warns when scans haven't synced yet
+- [x] Unsynced scans stay on the phone for that user and sync at their next sign-in
 
 ## 10. Tests
 
-- [ ] Unit: QR parsing and local results
-- [ ] Unit: sync with a fake API covering a lost response, a resend, a partial batch and both 409s
-- [ ] Unit: offline start, then create on reconnect, reusing an existing audit
-- [ ] Widget: scanner feedback, queue counter, Submit disabled while scans are unsynced
-- [ ] Widget: the Audit tab is hidden from instructors
+- [x] Unit: QR parsing and local results
+- [x] Unit: sync with a fake API covering a lost response, a resend, a partial batch and both 409s
+- [x] Unit: offline start, then create on reconnect, reusing an existing audit
+- [x] Widget: scanner feedback, queue counter, Submit disabled while scans are unsynced
+- [x] Widget: the Audit tab is hidden from instructors
 - [ ] Manual: scans survive force-closing the app mid-audit
 - [ ] Manual SC-8: 3 airplane-mode runs; the phone's scan count equals `GET /audits/{id}` items, with 0 lost and 0 duplicated
 

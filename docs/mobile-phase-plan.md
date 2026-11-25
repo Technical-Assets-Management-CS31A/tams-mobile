@@ -17,7 +17,7 @@ Mobile (Flutter) scope from the PRD (§6.6 screens, F2, F6, F7, §6.4 events, NF
 - [x] Bottom tabs: Approvals, My Loans, Alerts, Audit (each tab keeps its own back stack)
 - [x] Firebase setup for Android (`google-services.json`)
 - [x] Makefile shortcuts and CI pinned to the same Flutter version
-- [ ] Renew the access token with the refresh token (`/auth/refresh-token-mobile`) instead of signing out after 15 min (NFR-9)
+- [x] Renew the access token with the refresh token (`/auth/refresh-token-mobile`) instead of signing out after 15 min (NFR-9)
 - [ ] Call `POST /auth/logout` on sign-out so the server cancels the refresh token
 - [ ] Remove the unused `cloud_firestore` dependency
 
@@ -61,23 +61,23 @@ Mobile (Flutter) scope from the PRD (§6.6 screens, F2, F6, F7, §6.4 events, NF
 
 ## Phase 4 – Offline QR audit (Sprint 4: F7, US-13, US-14)
 
-- [ ] Audit tab replaces the placeholder screen
-- [ ] Audit room list: rooms from the API with a "Download roster" button (`GET /rooms/{id}/roster`)
-- [ ] Local database for rosters, audits and scans (works with no network)
-- [ ] Start an audit (`POST /audits`), or start it offline and create it on the server on reconnect
-- [ ] Camera QR scanner (camera permission on Android and iOS)
-- [ ] Each scan marked matched, misplaced (belongs to another room) or unknown, with on-screen feedback (FR-7.3)
-- [ ] Each scan saved locally with a `client_scan_id` and the phone's scan time
-- [ ] Offline queue counter on the scanner screen
-- [ ] Sync queued scans on reconnect via `POST /audits/{id}/scans:batch`, with no duplicates (FR-7.4, NFR-8)
-- [ ] Audit summary: unscanned roster items listed as missing (FR-7.5)
-- [ ] Submit the audit (`POST /audits/{id}/complete`)
-- [ ] Open or share the PDF report (`GET /audits/{id}/report?format=pdf`) (US-14)
+- [x] Audit tab replaces the placeholder screen
+- [x] Audit room list: rooms from the API with a "Download roster" button (`GET /rooms/{id}/roster`)
+- [x] Local database for rosters, audits and scans (works with no network)
+- [x] Start an audit (`POST /audits`), or start it offline and create it on the server on reconnect
+- [x] Camera QR scanner (camera permission on Android and iOS)
+- [x] Each scan marked matched, misplaced (belongs to another room) or unknown, with on-screen feedback (FR-7.3)
+- [x] Each scan saved locally with a `client_scan_id` and the phone's scan time
+- [x] Offline queue counter on the scanner screen
+- [x] Sync queued scans on reconnect via `POST /audits/{id}/scans:batch`, with no duplicates (FR-7.4, NFR-8)
+- [x] Audit summary: unscanned roster items listed as missing (FR-7.5)
+- [x] Submit the audit (`POST /audits/{id}/complete`)
+- [x] Open or share the PDF report (`GET /audits/{id}/report?format=pdf`) (US-14)
 - [ ] Tests: 3 offline runs with 0 lost and 0 duplicated scans (SC-8)
 
 ## Phase 5 – Roles, platforms and UAT (Sprint 4)
 
-- [ ] Read the user's role from the login response or JWT
+- [x] Read the user's role from the login response or JWT
 - [ ] Show tabs by role: Instructor gets Approvals / My Loans / Alerts, Lab Custodian gets Audit, Technical Personnel gets Audit + Alerts
 - [ ] iOS Firebase setup (`GoogleService-Info.plist`, APNs key) and a real bundle ID instead of `com.example.tamsMobile` (NFR-14)
 - [ ] Check it runs on Android 10+ and iOS 15+ (NFR-14)
