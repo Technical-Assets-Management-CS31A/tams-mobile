@@ -7,11 +7,19 @@ import 'package:dio/dio.dart';
 /// Returns [statusCode]/[body], or throws [error] if one is given.
 /// Fields are mutable so a test can change the next response.
 class FakeHttpAdapter implements HttpClientAdapter {
-  FakeHttpAdapter({this.statusCode = 200, this.body = const {}, this.error});
+  FakeHttpAdapter({
+    this.statusCode = 200,
+    this.body = const {},
+    this.error,
+    this.cause,
+  });
 
   int statusCode;
   Object body;
   DioExceptionType? error;
+
+  /// The low-level error behind [error], e.g. a socket error.
+  Object? cause;
 
   /// Extra response headers, e.g. `{'date': ['Wed, 18 Nov 2026 ...']}`.
   Map<String, List<String>> headers = {};
@@ -27,7 +35,7 @@ class FakeHttpAdapter implements HttpClientAdapter {
   ) async {
     lastRequest = options;
     if (error != null) {
-      throw DioException(requestOptions: options, type: error!);
+      throw DioException(requestOptions: options, type: error!, error: cause);
     }
     return ResponseBody.fromString(
       jsonEncode(body),

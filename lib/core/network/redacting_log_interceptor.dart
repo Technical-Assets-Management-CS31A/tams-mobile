@@ -7,6 +7,13 @@ import 'package:flutter/foundation.dart';
 /// headers, cookies) in headers and request/response bodies.
 class RedactingLogInterceptor extends Interceptor {
   static const _mask = '***';
+  static const _startedKey = 'logStartedAt';
+
+  static String _elapsed(RequestOptions options) {
+    final started = options.extra[_startedKey];
+    if (started is! DateTime) return '';
+    return ' (${DateTime.now().difference(started).inMilliseconds} ms)';
+  }
 
   static bool _isSensitive(String key) {
     final k = key.toLowerCase();
@@ -57,6 +64,7 @@ class RedactingLogInterceptor extends Interceptor {
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
+    options.extra[_startedKey] = DateTime.now();
     debugPrint('--> ${options.method} ${options.uri}');
     debugPrint('    headers: ${_headers(options.headers)}');
     if (options.data != null) {
@@ -67,7 +75,10 @@ class RedactingLogInterceptor extends Interceptor {
 
   @override
   void onResponse(Response response, ResponseInterceptorHandler handler) {
-    debugPrint('<-- ${response.statusCode} ${response.requestOptions.uri}');
+    debugPrint(
+      '<-- ${response.statusCode} ${response.requestOptions.uri}'
+      '${_elapsed(response.requestOptions)}',
+    );
     if (response.data != null) {
       debugPrint('    body: ${_redactBody(response.data)}');
     }
@@ -78,8 +89,12 @@ class RedactingLogInterceptor extends Interceptor {
   void onError(DioException err, ErrorInterceptorHandler handler) {
     debugPrint(
       '<-- ERROR ${err.response?.statusCode ?? err.type.name} '
-      '${err.requestOptions.uri}',
+      '${err.requestOptions.uri}${_elapsed(err.requestOptions)}',
     );
+    // Without a response, the cause (socket error, timeout) is the only clue.
+    if (err.response == null && err.error != null) {
+      debugPrint('    cause: ${err.error}');
+    }
     if (err.response?.data != null) {
       debugPrint('    body: ${_redactBody(err.response!.data)}');
     }
