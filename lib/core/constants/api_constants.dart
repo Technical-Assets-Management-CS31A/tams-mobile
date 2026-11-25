@@ -13,7 +13,7 @@ class ApiConstants {
     if (_baseUrlOverride.isNotEmpty) return _baseUrlOverride;
     // The Android emulator reaches the host machine at 10.0.2.2;
     // "localhost" there is the emulator itself.
-    final host = !kIsWeb && defaultTargetPlatform == TargetPlatform.android
+    final host = defaultTargetPlatform == TargetPlatform.android
         ? '10.0.2.2'
         : 'localhost';
     return 'http://$host:$_devPort/api/v1';

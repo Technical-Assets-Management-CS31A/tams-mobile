@@ -20,10 +20,8 @@ class ApprovalsRemoteDataSource {
   /// Pending requests with their times on the phone's clock, so the
   /// 120 s countdown is right even when the phone's clock is off.
   ///
-  /// The server's time comes from the `Date` response header. On the web
-  /// the browser only lets the app read it if the API sends
-  /// `Access-Control-Expose-Headers: Date` (or is on the same origin);
-  /// without it the phone's clock is used as is.
+  /// The server's time comes from the `Date` response header; without it
+  /// the phone's clock is used as is.
   Future<PendingApprovals> pending() async {
     final sentAt = _now();
     final res = await _dio.get<Object?>('/approvals/pending');

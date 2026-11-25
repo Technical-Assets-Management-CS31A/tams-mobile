@@ -2,7 +2,7 @@
 // ignore_for_file: type=lint
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'
-    show defaultTargetPlatform, kIsWeb, TargetPlatform;
+    show defaultTargetPlatform, TargetPlatform;
 
 /// Default [FirebaseOptions] for use with your Firebase apps.
 ///
@@ -16,39 +16,17 @@ import 'package:flutter/foundation.dart'
 /// ```
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
-    if (kIsWeb) {
-      return web;
-    }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
         return android;
       case TargetPlatform.iOS:
         return ios;
-      case TargetPlatform.macOS:
-        return macos;
-      case TargetPlatform.windows:
-        return windows;
-      case TargetPlatform.linux:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for linux - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
       default:
         throw UnsupportedError(
           'DefaultFirebaseOptions are not supported for this platform.',
         );
     }
   }
-
-  static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyAAf6JJGUT6gPpwnTFSKnaO-37xd8sKYgg',
-    appId: '1:882124940804:web:1823b87185f229c134b751',
-    messagingSenderId: '882124940804',
-    projectId: 'tams-mobile-4f75b',
-    authDomain: 'tams-mobile-4f75b.firebaseapp.com',
-    storageBucket: 'tams-mobile-4f75b.firebasestorage.app',
-    measurementId: 'G-VDGRC4FSRC',
-  );
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyDnwDAwPm06bPRv7REkIaL77kv90Gcft9g',
@@ -65,24 +43,5 @@ class DefaultFirebaseOptions {
     projectId: 'tams-mobile-4f75b',
     storageBucket: 'tams-mobile-4f75b.firebasestorage.app',
     iosBundleId: 'com.example.tamsMobile',
-  );
-
-  static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyC3u19707GtY0xq87gk4Pn0m7bnyi5UA6U',
-    appId: '1:882124940804:ios:6da75aa2cb5042d734b751',
-    messagingSenderId: '882124940804',
-    projectId: 'tams-mobile-4f75b',
-    storageBucket: 'tams-mobile-4f75b.firebasestorage.app',
-    iosBundleId: 'com.example.tamsMobile',
-  );
-
-  static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyAAf6JJGUT6gPpwnTFSKnaO-37xd8sKYgg',
-    appId: '1:882124940804:web:2d6dcb88d662e8af34b751',
-    messagingSenderId: '882124940804',
-    projectId: 'tams-mobile-4f75b',
-    authDomain: 'tams-mobile-4f75b.firebaseapp.com',
-    storageBucket: 'tams-mobile-4f75b.firebasestorage.app',
-    measurementId: 'G-PWG6F3F2FJ',
   );
 }

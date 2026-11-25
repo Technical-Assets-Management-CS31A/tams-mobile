@@ -9,8 +9,6 @@ final _imfFixdate = RegExp(
 
 /// Parses an HTTP `Date` header (`Wed, 18 Nov 2026 08:49:37 GMT`, the only
 /// format RFC 9110 lets servers send). Returns null for anything else.
-///
-/// `dart:io`'s `HttpDate` does this too, but isn't available on the web.
 DateTime? parseHttpDate(String? value) {
   final m = _imfFixdate.firstMatch(value?.trim() ?? '');
   if (m == null) return null;

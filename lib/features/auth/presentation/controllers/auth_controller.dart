@@ -85,7 +85,7 @@ class AuthController extends AsyncNotifier<User?> {
               refreshToken: user.refreshToken,
             );
       } catch (e) {
-        // e.g. no keyring on Linux, keystore error on Android. Remove any
+        // e.g. a keystore error on Android or Keychain error on iOS. Remove any
         // half-written entries and stay logged out.
         debugPrint('Could not save the session: $e');
         await _clearStorage();
