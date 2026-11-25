@@ -182,6 +182,30 @@ void main() {
     expect(textOf(tester, 'scan-progress'), '2 of 3 found');
   });
 
+  testWidgets('a scan that fails to save says so and can be scanned again', (
+    tester,
+  ) async {
+    await pumpScanner(tester, online: false);
+    await database.db.execute(
+      'CREATE TRIGGER fail_scans BEFORE INSERT ON scans '
+      "BEGIN SELECT RAISE(FAIL, 'disk I/O error'); END",
+    );
+
+    await scanCode(tester, 'tams:asset:$assetA');
+
+    expect(feedbackTitle(tester), "Couldn't save this scan");
+    expect(textOf(tester, 'scan-progress'), '0 of 3 found');
+    expect(haptics, isNotEmpty);
+
+    await database.db.execute('DROP TRIGGER fail_scans');
+    clock.advance(const Duration(seconds: 2));
+    await scanCode(tester, 'tams:asset:$assetA');
+
+    expect(feedbackTitle(tester), 'Found');
+    expect(textOf(tester, 'scan-progress'), '1 of 3 found');
+    expect(await store.scans('local-1'), hasLength(1));
+  });
+
   testWidgets('offline scans wait in the queue', (tester) async {
     await pumpScanner(tester, online: false);
 

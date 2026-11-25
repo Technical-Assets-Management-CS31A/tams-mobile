@@ -138,4 +138,9 @@ class _Banner extends StatelessWidget {
         const Color(0xFF1F2937),
         Icons.repeat_rounded,
       ),
+      ScanFeedbackKind.saveFailed => (
+        const Color(0xFFFEE2E2),
+        const Color(0xFF7F1D1D),
+        Icons.error_outline_rounded,
+      ),
     };
