@@ -43,7 +43,7 @@ These match unchecked items in [mobile-phase-plan.md](mobile-phase-plan.md). Che
 
 ### Auth and session (Phase 1)
 
-- [ ] `POST /auth/refresh` with `{refreshToken}` – renew the 15-minute token instead of signing out (NFR-9).
+- [x] `POST /auth/refresh` with `{refreshToken}` – renew the 15-minute token instead of signing out (NFR-9).
 - [ ] `POST /auth/logout` with an optional `{refreshToken}` – cancel the refresh token on sign-out.
 - [ ] `POST /auth/change-password` with `{currentPassword, newPassword}` – change password screen. Not in the PRD; nice to have.
 
@@ -63,16 +63,16 @@ This was the Phase 2 blocker. The endpoints now exist.
 
 In the order the audit flow uses them:
 
-- [ ] `GET /rooms?page=&pageSize=&q=` – list the rooms to audit.
-- [ ] `GET /rooms/{id}/roster` – download the room's roster for offline use (FR-7.3).
-- [ ] `GET /audits?roomId=&status=` – resume an unfinished audit.
-- [ ] `POST /audits` with `{roomId}` – start an audit.
-- [ ] `POST /audits/{id}/scans:batch` with `{scans: [{clientScanId, scannedValue, scannedAt}]}` – sync offline scans. `clientScanId` prevents duplicates (FR-7.4, NFR-8). `scannedValue` is the raw QR text.
+- [x] `GET /rooms?page=&pageSize=&q=` – list the rooms to audit.
+- [x] `GET /rooms/{id}/roster` – download the room's roster for offline use (FR-7.3).
+- [x] `GET /audits?roomId=&status=` – resume an unfinished audit.
+- [x] `POST /audits` with `{roomId}` – start an audit.
+- [x] `POST /audits/{id}/scans:batch` with `{scans: [{clientScanId, scannedValue, scannedAt}]}` – sync offline scans. `clientScanId` prevents duplicates (FR-7.4, NFR-8). `scannedValue` is the raw QR text.
 - [ ] `GET /assets/{id}` – show what a scanned QR is (name, home room).
-- [ ] `POST /audits/{id}/complete` – finish the audit. Roster items that weren't scanned become missing (FR-7.5).
-- [ ] `POST /audits/{id}/sign-off` – custodian sign-off.
-- [ ] `GET /audits/{id}` – audit results after the sync.
-- [ ] `GET /audits/{id}/report?format=pdf` – open or share the report as `pdf` or `csv` (US-14).
+- [x] `POST /audits/{id}/complete` – finish the audit. Roster items that weren't scanned become missing (FR-7.5).
+- [x] `POST /audits/{id}/sign-off` – custodian sign-off.
+- [x] `GET /audits/{id}` – audit results after the sync.
+- [x] `GET /audits/{id}/report?format=pdf` – open or share the report as `pdf` or `csv` (US-14).
 
 ### Staff on mobile (optional)
 
@@ -90,7 +90,7 @@ The spec doesn't cover these.
 - [ ] **Roles.** The spec doesn't say which role can call which endpoint. Confirm that instructors can use approvals, loans and notifications, and that custodians can use audits.
 - [ ] **SignalR hub.** WebSocket hubs don't appear in OpenAPI. Confirm whether a hub exists and what its path is. If there isn't one, use push plus polling.
 - [ ] **`platform` values** for `POST /device-tokens`, for example `android` and `ios`.
-- [ ] **QR content.** Does a QR label hold only the asset UUID? If so, the app can match it against the roster offline.
+- [x] **QR content.** Does a QR label hold only the asset UUID? If so, the app can match it against the roster offline.
 
 ## 5. Not for mobile
 
