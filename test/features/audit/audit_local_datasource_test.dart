@@ -49,7 +49,7 @@ void main() {
 
   group('rosters', () {
     test('saves a roster and reads it back', () async {
-      await mine.saveRoster(roster());
+      await mine.saveRoster(labRoster());
 
       final saved = await mine.roster(lab1.id);
       expect(saved!.items.map((i) => i.assetCode), [
@@ -64,10 +64,10 @@ void main() {
     });
 
     test('downloading again replaces the items', () async {
-      await mine.saveRoster(roster());
+      await mine.saveRoster(labRoster());
       await mine.saveRoster(
-        roster(
-          items: [roster().items.first],
+        labRoster(
+          items: [labRoster().items.first],
           downloadedAt: DateTime.utc(2026, 11, 25, 3),
         ),
       );
@@ -81,7 +81,7 @@ void main() {
     });
 
     test('an empty roster still counts as downloaded', () async {
-      await mine.saveRoster(roster(room: storageRoom, items: const []));
+      await mine.saveRoster(labRoster(room: storageRoom, items: const []));
 
       expect((await mine.rosterInfos())[storageRoom.id]!.itemCount, 0);
       expect((await mine.roster(storageRoom.id))!.items, isEmpty);
@@ -254,7 +254,7 @@ void main() {
   group('another user on the same phone', () {
     test('sees none of my data', () async {
       await mine.cacheRooms([lab1]);
-      await mine.saveRoster(roster());
+      await mine.saveRoster(labRoster());
       await mine.insertAudit(openAudit());
       await mine.addScan(scan('s-1'));
 
