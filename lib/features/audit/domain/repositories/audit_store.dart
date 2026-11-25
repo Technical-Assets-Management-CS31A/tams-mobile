@@ -36,6 +36,9 @@ abstract interface class AuditStore {
     required DateTime completedAt,
   });
 
+  /// Records the sign-off of a submitted audit.
+  Future<void> markSignedOff(String localId);
+
   Future<void> deleteAudit(String localId);
 
   Future<bool> addScan(AuditScan scan);

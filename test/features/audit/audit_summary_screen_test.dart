@@ -182,6 +182,59 @@ void main() {
     expect(container.read(auditRevisionProvider), greaterThan(before));
   });
 
+  Future<void> signOff(WidgetTester tester) async {
+    await tester.tap(find.text('Sign off'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('sign-off-confirm')));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('signing off after submitting is kept on this phone', (
+    tester,
+  ) async {
+    await syncFirst();
+    await pumpSummary(tester, role: UserRole.techStaff);
+    await tester.tap(find.text('Submit audit'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('submit-confirm')));
+    await tester.pumpAndSettle();
+
+    await signOff(tester);
+
+    expect(server.signedOff, hasLength(1));
+    expect(find.text('Submitted and signed off'), findsOneWidget);
+    expect(find.text('Sign off'), findsNothing);
+    expect((await store.audit('local-1'))!.status, AuditStatus.signedOff);
+  });
+
+  testWidgets('signing off a reopened submitted audit updates it', (
+    tester,
+  ) async {
+    await syncFirst();
+    final local = (await store.audit('local-1'))!;
+    await server.complete(local.serverId!);
+    await store.completeAudit(
+      'local-1',
+      counts: const AuditCounts(
+        expected: 3,
+        matched: 1,
+        missing: 2,
+        misplaced: 0,
+        unknown: 0,
+      ),
+      completedAt: DateTime.utc(2026, 11, 25, 4),
+    );
+    await pumpSummary(tester, role: UserRole.techStaff);
+    expect(find.text('Submitted'), findsOneWidget);
+
+    await signOff(tester);
+
+    expect(server.signedOff, [local.serverId]);
+    expect(find.text('Submitted and signed off'), findsOneWidget);
+    expect(find.text('Sign off'), findsNothing);
+    expect((await store.audit('local-1'))!.status, AuditStatus.signedOff);
+  });
+
   testWidgets('custodians cannot sign off', (tester) async {
     await syncFirst();
     await pumpSummary(tester);
