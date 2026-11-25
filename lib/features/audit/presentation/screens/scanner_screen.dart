@@ -89,7 +89,8 @@ class ScannerScreen extends ConsumerWidget {
         HapticFeedback.selectionClick();
       case ScanFeedbackKind.pending ||
           ScanFeedbackKind.misplaced ||
-          ScanFeedbackKind.unknown:
+          ScanFeedbackKind.unknown ||
+          ScanFeedbackKind.saveFailed:
         HapticFeedback.heavyImpact();
     }
   }

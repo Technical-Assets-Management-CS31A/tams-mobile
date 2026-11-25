@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/errors/failures.dart';
@@ -13,7 +14,14 @@ import '../../domain/entities/roster.dart';
 import 'audit_providers.dart';
 import 'audit_sync_controller.dart';
 
-enum ScanFeedbackKind { matched, misplaced, pending, unknown, alreadyScanned }
+enum ScanFeedbackKind {
+  matched,
+  misplaced,
+  pending,
+  unknown,
+  alreadyScanned,
+  saveFailed,
+}
 
 class ScanFeedback {
   const ScanFeedback({
@@ -125,10 +133,23 @@ class ScanController extends AsyncNotifier<ScanSession> {
     final seen = _seenAt.containsKey(value);
     _seenAt[value] = now;
     if (seen) return;
-    _queue = _queue.then((_) => _record(value, now)).catchError((_) {});
+    _queue = _queue.then((_) => _record(value, now));
   }
 
+  /// Never throws, so one failed scan doesn't stop the ones queued after it.
   Future<void> _record(String value, DateTime at) async {
+    try {
+      await _save(value, at);
+    } catch (e) {
+      // Left the scanner while this was queued: nothing to show.
+      if (!ref.mounted) return;
+      debugPrint('Could not save the scan: $e');
+      final session = state.value;
+      if (session != null) state = AsyncData(session.showing(_saveFailed()));
+    }
+  }
+
+  Future<void> _save(String value, DateTime at) async {
     final session = state.value;
     if (session == null || !session.audit.isOpen) return;
 
@@ -176,6 +197,15 @@ class ScanController extends AsyncNotifier<ScanSession> {
     kind: ScanFeedbackKind.alreadyScanned,
     title: 'Already scanned',
     detail: describeScan(scan),
+    serial: ++_serial,
+  );
+
+  /// The label stays in the repeat filter while it's in view, so a database
+  /// that keeps failing isn't retried at the camera's frame rate.
+  ScanFeedback _saveFailed() => ScanFeedback(
+    kind: ScanFeedbackKind.saveFailed,
+    title: "Couldn't save this scan",
+    detail: 'Move the camera off the label, then scan it again.',
     serial: ++_serial,
   );
 
