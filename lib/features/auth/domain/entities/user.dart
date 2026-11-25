@@ -8,4 +8,7 @@ class User {
   final String? refreshToken;
 
   const User({required this.email, required this.token, this.refreshToken});
+
+  User withToken(String token) =>
+      User(email: email, token: token, refreshToken: refreshToken);
 }

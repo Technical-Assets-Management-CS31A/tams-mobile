@@ -32,7 +32,13 @@ class AuthController extends AsyncNotifier<User?> {
   Future<User?> build() async {
     // The Dio interceptor clears the token when the server answers 401.
     ref.listen(authTokenProvider, (_, token) {
-      if (token == null && state.value != null) _endSession();
+      final user = state.value;
+      if (user == null) return;
+      if (token == null) {
+        _endSession();
+      } else if (token != user.token) {
+        state = AsyncData(user.withToken(token));
+      }
     });
     return _restoreSession();
   }
@@ -61,9 +67,8 @@ class AuthController extends AsyncNotifier<User?> {
     if (saved == null) return null;
 
     final expiry = jwtExpiry(saved.token);
-    if (expiry != null && !expiry.isAfter(DateTime.now())) {
-      // Student/teacher tokens last 15 minutes.
-      // TODO: renew via /auth/refresh-token-mobile instead of signing out.
+    final expired = expiry != null && !expiry.isAfter(DateTime.now());
+    if (expired && saved.refreshToken == null) {
       await _clearStorage();
       return null;
     }
