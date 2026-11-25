@@ -6,6 +6,7 @@ import 'package:tams_mobile/core/network/token_provider.dart';
 import 'package:tams_mobile/features/alerts/presentation/controllers/alerts_controller.dart';
 import 'package:tams_mobile/features/approvals/presentation/controllers/approvals_controller.dart';
 import 'package:tams_mobile/features/auth/domain/entities/user.dart';
+import 'package:tams_mobile/features/auth/domain/entities/user_role.dart';
 import 'package:tams_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:tams_mobile/features/loans/presentation/controllers/loan_detail_provider.dart';
 import 'package:tams_mobile/features/shell/presentation/widgets/shell_header.dart';
@@ -17,11 +18,14 @@ import '../../helpers/fake_loans_repository.dart';
 
 /// Signed in as a known user; records sign-outs instead of touching storage.
 class _FakeAuth extends AuthController {
+  _FakeAuth([this.role = UserRole.techStaff]);
+
+  final UserRole role;
   int logouts = 0;
 
   @override
   Future<User?> build() async =>
-      const User(email: 'teacher@school.edu', token: 'test-token');
+      User(email: 'teacher@school.edu', token: 'test-token', role: role);
 
   @override
   Future<void> logout() async => logouts++;
@@ -49,7 +53,7 @@ Future<GoRouter> _pumpShell(
         ),
         loansRepositoryProvider.overrideWithValue(FakeLoansRepository()),
         authTokenProvider.overrideWith(SignedInToken.new),
-        if (auth != null) authControllerProvider.overrideWith(() => auth),
+        authControllerProvider.overrideWith(() => auth ?? _FakeAuth()),
       ],
       child: MaterialApp.router(routerConfig: router),
     ),
@@ -66,6 +70,19 @@ void main() {
     expect(find.byType(NavigationDestination), findsNWidgets(4));
     expect(find.text('No pending approvals'), findsOneWidget);
     expect(find.byTooltip('Sign out'), findsOneWidget);
+  });
+
+  testWidgets('instructors do not see the Audit tab', (tester) async {
+    await _pumpShell(tester, auth: _FakeAuth(UserRole.instructor));
+
+    expect(find.byType(NavigationDestination), findsNWidgets(3));
+    expect(
+      find.descendant(
+        of: find.byType(NavigationBar),
+        matching: find.text('Audit'),
+      ),
+      findsNothing,
+    );
   });
 
   testWidgets('the Alerts tab shows the unread count', (tester) async {
