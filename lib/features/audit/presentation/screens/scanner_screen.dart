@@ -34,53 +34,50 @@ class ScannerScreen extends ConsumerWidget {
 
     final room = session.value?.roster.room;
 
-    return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.dark,
-      child: Scaffold(
-        backgroundColor: Colors.white,
-        appBar: brandAppBar(
-          context,
-          title: room?.label ?? 'Scan',
-          subtitle: room == null || room.place.isEmpty ? null : room.place,
-          actions: [ConnectionChip(online: online)],
+    return BrandPage(
+      // The code as the header and the name under it, such as STORE-1
+      // over Equipment Storage.
+      title: room?.code ?? 'Scan',
+      subtitle: room == null || room.name.isEmpty || room.name == room.code
+          ? null
+          : room.name,
+      trailing: ConnectionChip(online: online),
+      body: switch (session) {
+        // Black behind the panel's rounded top corners, so they read as
+        // a sheet laid over the camera.
+        AsyncValue(:final value?) => ColoredBox(
+          color: Colors.black,
+          child: Column(
+            children: [
+              Expanded(
+                child: value.audit.isOpen
+                    ? ref.watch(scanCameraProvider)(
+                        ref.read(provider.notifier).onCode,
+                      )
+                    : ColoredBox(
+                        color: Colors.white,
+                        child: _Closed(status: value.audit.status),
+                      ),
+              ),
+              _ScanPanel(
+                session: value,
+                online: online,
+                localAuditId: localAuditId,
+              ),
+            ],
+          ),
         ),
-        body: switch (session) {
-          // Black behind the panel's rounded top corners, so they read as
-          // a sheet laid over the camera.
-          AsyncValue(:final value?) => ColoredBox(
-            color: Colors.black,
-            child: Column(
-              children: [
-                Expanded(
-                  child: value.audit.isOpen
-                      ? ref.watch(scanCameraProvider)(
-                          ref.read(provider.notifier).onCode,
-                        )
-                      : ColoredBox(
-                          color: Colors.white,
-                          child: _Closed(status: value.audit.status),
-                        ),
-                ),
-                _ScanPanel(
-                  session: value,
-                  online: online,
-                  localAuditId: localAuditId,
-                ),
-              ],
-            ),
-          ),
-          AsyncValue(:final error?) => EmptyState(
-            icon: Icons.error_outline,
-            title: "Couldn't open this audit",
-            message: error is Failure
-                ? error.message
-                : 'Something went wrong. Please try again.',
-          ),
-          _ => const Center(
-            child: CircularProgressIndicator(color: BrandColors.primary),
-          ),
-        },
-      ),
+        AsyncValue(:final error?) => EmptyState(
+          icon: Icons.error_outline,
+          title: "Couldn't open this audit",
+          message: error is Failure
+              ? error.message
+              : 'Something went wrong. Please try again.',
+        ),
+        _ => const Center(
+          child: CircularProgressIndicator(color: BrandColors.primary),
+        ),
+      },
     );
   }
 
@@ -98,6 +95,7 @@ class ScannerScreen extends ConsumerWidget {
   }
 }
 
+/// "Online" or "Offline" with a coloured dot, for a screen's header.
 class ConnectionChip extends StatelessWidget {
   const ConnectionChip({super.key, required this.online});
 
@@ -105,40 +103,26 @@ class ConnectionChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 16),
-      child: Center(
-        child: Container(
-          key: const Key('connection-status'),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: online ? BrandColors.successBg : BrandColors.field,
-            borderRadius: BorderRadius.circular(999),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 7,
-                height: 7,
-                decoration: BoxDecoration(
-                  color: online ? BrandColors.success : BrandColors.faint,
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                online ? 'Online' : 'Offline',
-                style: brandText(
-                  12,
-                  weight: FontWeight.w600,
-                  color: online ? BrandColors.success : BrandColors.muted,
-                ),
-              ),
-            ],
+    final color = online ? BrandColors.success : BrandColors.faint;
+    return Row(
+      key: const Key('connection-status'),
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          online ? 'Online' : 'Offline',
+          style: brandText(
+            13,
+            weight: FontWeight.w500,
+            color: online ? BrandColors.success : BrandColors.muted,
           ),
         ),
-      ),
+      ],
     );
   }
 }

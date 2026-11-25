@@ -37,13 +37,9 @@ class RoomAuditsScreen extends ConsumerWidget {
     final now = ref.watch(clockProvider)();
     final code = room?.code ?? '';
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: brandAppBar(
-        context,
-        title: room?.label ?? 'Room',
-        subtitle: 'Past audits',
-      ),
+    return BrandPage(
+      title: room?.label ?? 'Room',
+      subtitle: 'Past audits',
       body: !online
           ? const EmptyState(
               icon: Icons.cloud_off_outlined,

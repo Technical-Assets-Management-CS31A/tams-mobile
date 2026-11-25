@@ -36,15 +36,11 @@ class _AuditSummaryScreenState extends ConsumerState<AuditSummaryScreen> {
     final session = ref.watch(scanControllerProvider(widget.localAuditId));
     final online = ref.watch(isOnlineProvider);
 
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: brandAppBar(
-        context,
-        title: session.value == null
-            ? 'Summary'
-            : '${session.value!.roster.room.code} summary',
-        actions: [ConnectionChip(online: online)],
-      ),
+    return BrandPage(
+      title: session.value == null
+          ? 'Summary'
+          : '${session.value!.roster.room.code} summary',
+      trailing: ConnectionChip(online: online),
       body: switch (session) {
         AsyncValue(:final value?) => _body(value, online),
         AsyncValue(:final error?) => EmptyState(
