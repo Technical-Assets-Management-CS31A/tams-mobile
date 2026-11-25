@@ -152,6 +152,36 @@ void main() {
     expect(feedbackTitle(tester), 'Already scanned');
   });
 
+  testWidgets('a label held in view does not repeat Already scanned', (
+    tester,
+  ) async {
+    await pumpScanner(tester);
+    await scanCode(tester, 'tams:asset:$assetA');
+    final buzzes = haptics.length;
+
+    for (var i = 0; i < 20; i++) {
+      clock.advance(const Duration(milliseconds: 250));
+      await scanCode(tester, 'tams:asset:$assetA');
+    }
+
+    expect(feedbackTitle(tester), 'Found');
+    expect(haptics, hasLength(buzzes));
+  });
+
+  testWidgets('two labels in view are each recorded once', (tester) async {
+    await pumpScanner(tester);
+
+    for (var i = 0; i < 10; i++) {
+      await scanCode(tester, 'tams:asset:$assetA');
+      await scanCode(tester, 'tams:asset:$assetB');
+      clock.advance(const Duration(milliseconds: 250));
+    }
+
+    expect(await store.scans('local-1'), hasLength(2));
+    expect(feedbackTitle(tester), 'Found');
+    expect(textOf(tester, 'scan-progress'), '2 of 3 found');
+  });
+
   testWidgets('offline scans wait in the queue', (tester) async {
     await pumpScanner(tester, online: false);
 

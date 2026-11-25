@@ -87,8 +87,9 @@ class ScanController extends AsyncNotifier<ScanSession> {
 
   static const repeatWindow = Duration(seconds: 2);
 
-  String? _lastValue;
-  DateTime? _lastAt;
+  /// When the camera last reported each value, so several labels in view are
+  /// filtered separately and a label held in view does not repeat.
+  final _seenAt = <String, DateTime>{};
   int _serial = 0;
   Future<void> _queue = Future.value();
 
@@ -120,14 +121,10 @@ class ScanController extends AsyncNotifier<ScanSession> {
     final value = raw.trim();
     if (value.isEmpty) return;
     final now = ref.read(clockProvider)();
-    final last = _lastAt;
-    if (value == _lastValue &&
-        last != null &&
-        now.difference(last) < repeatWindow) {
-      return;
-    }
-    _lastValue = value;
-    _lastAt = now;
+    _seenAt.removeWhere((_, at) => now.difference(at) >= repeatWindow);
+    final seen = _seenAt.containsKey(value);
+    _seenAt[value] = now;
+    if (seen) return;
     _queue = _queue.then((_) => _record(value, now)).catchError((_) {});
   }
 
