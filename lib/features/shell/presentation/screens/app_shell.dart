@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../alerts/presentation/controllers/alerts_controller.dart';
+import '../../../auth/domain/entities/user_role.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../../loans/presentation/controllers/loan_detail_provider.dart';
 import '../widgets/shell_header.dart';
@@ -42,12 +43,19 @@ const shellTabs = [
     Icons.inventory_2,
   ),
   alertsTab,
-  ShellTab(
-    'Audit',
-    'Check-outs, returns and approvals',
-    Icons.history,
-    Icons.history,
-  ),
+  auditTab,
+];
+
+const auditTab = ShellTab(
+  'Audit',
+  'Room inventory checks',
+  Icons.qr_code_scanner_outlined,
+  Icons.qr_code_scanner,
+);
+
+List<int> visibleTabs(UserRole role) => [
+  for (var i = 0; i < shellTabs.length; i++)
+    if (shellTabs[i] != auditTab || role.canAudit) i,
 ];
 
 /// Signed-in frame: header, the current tab, and the bottom navigation bar.
@@ -94,6 +102,12 @@ class _AppShellState extends ConsumerState<AppShell> {
       alertsControllerProvider.select((s) => s.value?.unreadCount ?? 0),
     );
 
+    final role = ref.watch(
+      authControllerProvider.select((s) => s.value?.role ?? UserRole.unknown),
+    );
+    final visible = visibleTabs(role);
+    final selected = visible.indexOf(index);
+
     final tab = shellTabs[index];
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -121,12 +135,13 @@ class _AppShellState extends ConsumerState<AppShell> {
           ],
         ),
         bottomNavigationBar: NavigationBar(
-          selectedIndex: index,
-          // Tapping the current tab again returns it to its first screen.
-          onDestinationSelected: (i) =>
-              navigationShell.goBranch(i, initialLocation: i == index),
+          selectedIndex: selected < 0 ? 0 : selected,
+          onDestinationSelected: (i) => navigationShell.goBranch(
+            visible[i],
+            initialLocation: visible[i] == index,
+          ),
           destinations: [
-            for (final tab in shellTabs)
+            for (final tab in [for (final i in visible) shellTabs[i]])
               NavigationDestination(
                 icon: _badged(tab, tab.icon, unread),
                 selectedIcon: _badged(tab, tab.selectedIcon, unread),
