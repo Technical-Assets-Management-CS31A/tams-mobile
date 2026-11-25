@@ -32,9 +32,7 @@ class AuditSessionService {
 
     if (online) {
       try {
-        final (server, roster) = await _repository.start(room.id);
-        await _store.saveRoster(roster);
-        return await _insert(room.id, serverId: server.id);
+        return await _startOnServer(room.id);
       } on AuditFailure catch (f) {
         if (!f.offline) rethrow;
       }
@@ -49,14 +47,37 @@ class AuditSessionService {
     return _insert(room.id);
   }
 
-  Future<LocalAudit> _insert(String roomId, {String? serverId}) async {
+  /// Continues an audit of the room I left open on the server, e.g. from
+  /// another phone or before a reinstall, or starts a new one.
+  Future<LocalAudit> _startOnServer(String roomId) async {
+    final open = await _repository.audits(
+      roomId: roomId,
+      status: AuditStatus.inProgress,
+    );
+    final mine = open
+        .where((a) => a.startedByUserId == _store.userId)
+        .firstOrNull;
+    if (mine != null) {
+      await _store.saveRoster(await _repository.roster(roomId));
+      return _insert(roomId, serverId: mine.id, startedAt: mine.startedAt);
+    }
+    final (server, roster) = await _repository.start(roomId);
+    await _store.saveRoster(roster);
+    return _insert(roomId, serverId: server.id);
+  }
+
+  Future<LocalAudit> _insert(
+    String roomId, {
+    String? serverId,
+    DateTime? startedAt,
+  }) async {
     final audit = LocalAudit(
       localId: _newId(),
       serverId: serverId,
       userId: _store.userId,
       roomId: roomId,
       status: AuditStatus.inProgress,
-      startedAt: _clock(),
+      startedAt: startedAt ?? _clock(),
     );
     await _store.insertAudit(audit);
     return audit;
