@@ -4,15 +4,19 @@ import '../../domain/entities/audit.dart';
 import '../../domain/entities/audit_room.dart';
 import '../../domain/entities/audit_scan.dart';
 import '../../domain/entities/roster.dart';
+import '../../domain/repositories/audit_store.dart';
 import '../local/audit_database.dart';
 
-class AuditLocalDataSource {
+class AuditLocalDataSource implements AuditStore {
   AuditLocalDataSource(AuditDatabase database, {required this.userId})
     : _db = database.db;
 
   final Database _db;
+
+  @override
   final String userId;
 
+  @override
   Future<void> cacheRooms(List<AuditRoom> rooms) async {
     final batch = _db.batch();
     for (final r in rooms) {
@@ -30,6 +34,7 @@ class AuditLocalDataSource {
     await batch.commit(noResult: true);
   }
 
+  @override
   Future<List<AuditRoom>> cachedRooms({String query = ''}) async {
     final q = query.trim();
     final rows = await _db.query(
@@ -46,6 +51,7 @@ class AuditLocalDataSource {
     return [for (final r in rows) _room(r)];
   }
 
+  @override
   Future<void> saveRoster(Roster roster) => _db.transaction((tx) async {
     final roomId = roster.room.id;
     final at = _date(roster.downloadedAt);
@@ -78,6 +84,7 @@ class AuditLocalDataSource {
     await batch.commit(noResult: true);
   });
 
+  @override
   Future<Roster?> roster(String roomId) async {
     final head = await _db.query(
       'rosters',
@@ -113,6 +120,7 @@ class AuditLocalDataSource {
     );
   }
 
+  @override
   Future<Map<String, RosterInfo>> rosterInfos() async {
     final rows = await _db.rawQuery(
       '''
@@ -134,6 +142,7 @@ class AuditLocalDataSource {
     };
   }
 
+  @override
   Future<void> insertAudit(LocalAudit audit) => _db.insert('audits', {
     'local_id': audit.localId,
     'server_id': audit.serverId,
@@ -143,6 +152,7 @@ class AuditLocalDataSource {
     'started_at': _date(audit.startedAt),
   });
 
+  @override
   Future<LocalAudit?> audit(String localId) async {
     final rows = await _db.query(
       'audits',
@@ -152,6 +162,7 @@ class AuditLocalDataSource {
     return rows.isEmpty ? null : _audit(rows.single);
   }
 
+  @override
   Future<List<LocalAudit>> openAudits() async {
     final rows = await _db.query(
       'audits',
@@ -162,6 +173,7 @@ class AuditLocalDataSource {
     return [for (final r in rows) _audit(r)];
   }
 
+  @override
   Future<List<LocalAudit>> unfinishedAudits() async {
     final rows = await _db.query(
       'audits',
@@ -176,6 +188,7 @@ class AuditLocalDataSource {
     return [for (final r in rows) _audit(r)];
   }
 
+  @override
   Future<LocalAudit?> openAuditFor(String roomId) async {
     final rows = await _db.query(
       'audits',
@@ -185,6 +198,7 @@ class AuditLocalDataSource {
     return rows.isEmpty ? null : _audit(rows.single);
   }
 
+  @override
   Future<void> setServerId(String localId, String serverId) => _db.update(
     'audits',
     {'server_id': serverId},
@@ -192,6 +206,7 @@ class AuditLocalDataSource {
     whereArgs: [userId, localId],
   );
 
+  @override
   Future<void> markEndedElsewhere(String localId) => _db.update(
     'audits',
     {'status': AuditStatus.endedElsewhere.label},
@@ -199,6 +214,7 @@ class AuditLocalDataSource {
     whereArgs: [userId, localId],
   );
 
+  @override
   Future<void> completeAudit(
     String localId, {
     required AuditCounts counts,
@@ -225,12 +241,14 @@ class AuditLocalDataSource {
     );
   });
 
+  @override
   Future<void> deleteAudit(String localId) => _db.delete(
     'audits',
     where: 'user_id = ? AND local_id = ?',
     whereArgs: [userId, localId],
   );
 
+  @override
   Future<bool> addScan(AuditScan scan) async {
     final id = await _db.insert('scans', {
       'client_scan_id': scan.clientScanId,
@@ -249,6 +267,7 @@ class AuditLocalDataSource {
     return id != 0;
   }
 
+  @override
   Future<List<AuditScan>> scans(String localAuditId) async {
     final rows = await _db.query(
       'scans',
@@ -259,6 +278,7 @@ class AuditLocalDataSource {
     return [for (final r in rows) _scan(r)];
   }
 
+  @override
   Future<List<AuditScan>> unsyncedScans(
     String localAuditId, {
     int? limit,
@@ -273,6 +293,7 @@ class AuditLocalDataSource {
     return [for (final r in rows) _scan(r)];
   }
 
+  @override
   Future<int> unsyncedCount({String? localAuditId}) async {
     final rows = await _db.rawQuery(
       '''
@@ -286,6 +307,7 @@ class AuditLocalDataSource {
     return rows.single['n']! as int;
   }
 
+  @override
   Future<void> markSynced(List<SyncedScan> results, DateTime syncedAt) async {
     final batch = _db.batch();
     final at = _date(syncedAt);
