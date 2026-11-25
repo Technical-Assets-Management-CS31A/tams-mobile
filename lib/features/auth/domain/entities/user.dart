@@ -1,3 +1,5 @@
+import 'user_role.dart';
+
 class User {
   final String email;
 
@@ -7,8 +9,22 @@ class User {
   /// Used to get a new access token once [token] expires.
   final String? refreshToken;
 
-  const User({required this.email, required this.token, this.refreshToken});
+  final String? id;
+  final UserRole role;
 
-  User withToken(String token) =>
-      User(email: email, token: token, refreshToken: refreshToken);
+  const User({
+    required this.email,
+    required this.token,
+    this.refreshToken,
+    this.id,
+    this.role = UserRole.unknown,
+  });
+
+  User withToken(String token) => User(
+    email: email,
+    token: token,
+    refreshToken: refreshToken,
+    id: id,
+    role: role,
+  );
 }

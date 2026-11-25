@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:tams_mobile/core/errors/failures.dart';
 import 'package:tams_mobile/features/auth/data/datasources/auth_remote_datasource.dart';
 import 'package:tams_mobile/features/auth/data/repositories/auth_repository_impl.dart';
+import 'package:tams_mobile/features/auth/domain/entities/user_role.dart';
 
 import '../../helpers/fake_http_adapter.dart';
 import '../../helpers/login_fixtures.dart';
@@ -32,6 +33,33 @@ void main() {
       expect(user.refreshToken, 'rt-1');
       expect(adapter.lastRequest!.path, '/auth/login');
       expect(adapter.lastRequest!.data, {'email': 'a@b.com', 'password': 'pw'});
+    });
+
+    test('parses the user id and role', () async {
+      final adapter = FakeHttpAdapter(body: loginResponse(role: 'TECH_STAFF'));
+      final user = await repoWith(adapter).login('a@b.com', 'pw');
+
+      expect(user.id, loginUserId);
+      expect(user.role, UserRole.techStaff);
+    });
+
+    test(
+      'reads the id and role from the JWT when the body lacks them',
+      () async {
+        final token = fakeJwt(DateTime.now(), role: 'ADMIN');
+        final adapter = FakeHttpAdapter(body: {'accessToken': token});
+        final user = await repoWith(adapter).login('a@b.com', 'pw');
+
+        expect(user.id, 'user-1');
+        expect(user.role, UserRole.admin);
+      },
+    );
+
+    test('an unknown role is unknown', () {
+      expect(UserRole.fromClaim('STUDENT'), UserRole.unknown);
+      expect(UserRole.fromClaim(null), UserRole.unknown);
+      expect(UserRole.fromClaim('custodian'), UserRole.custodian);
+      expect(UserRole.fromClaim(['TECH_STAFF']), UserRole.techStaff);
     });
 
     test('reads tokens at the top level of the response', () async {

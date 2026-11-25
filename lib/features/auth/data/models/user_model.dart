@@ -1,10 +1,14 @@
+import '../../../../core/utils/jwt.dart';
 import '../../domain/entities/user.dart';
+import '../../domain/entities/user_role.dart';
 
 class UserModel extends User {
   const UserModel({
     required super.email,
     required super.token,
     super.refreshToken,
+    super.id,
+    super.role,
   });
 
   /// Parses the body of `POST /auth/login`. The tokens can sit at the top
@@ -39,10 +43,17 @@ class UserModel extends User {
         _string(data['email']) ??
         fallbackEmail;
 
+    final claims = jwtClaims(token);
+    final role = UserRole.fromClaim(user is Map ? user['role'] : null);
+
     return UserModel(
       email: email,
       token: token,
       refreshToken: _string(data['refreshToken']),
+      id: (user is Map ? _string(user['id']) : null) ?? _string(claims?['sub']),
+      role: role == UserRole.unknown
+          ? UserRole.fromClaim(claims?['role'])
+          : role,
     );
   }
 
