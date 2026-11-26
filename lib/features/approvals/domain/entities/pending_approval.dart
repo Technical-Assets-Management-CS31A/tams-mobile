@@ -131,32 +131,95 @@ class PendingApproval {
       );
 }
 
-/// What `GET /approvals/pending` returns: the requests, and whether the
-/// instructor's approval rights are frozen (FR-2.3).
+/// Why staff froze my approval rights (PRD 4.1, F6): a loan I approved
+/// went overdue or missing, or brought its student a 4th late arrival.
+enum FreezeReason {
+  lateArrivalLimit('4th late arrival'),
+  overdue('Overdue'),
+  missing('Missing'),
+  other('Frozen');
+
+  const FreezeReason(this.label);
+
+  final String label;
+
+  /// From the backend's `penalty_reason` label, e.g. `LATE_ARRIVAL_LIMIT`.
+  static FreezeReason parse(Object? label) => switch (label) {
+    'LATE_ARRIVAL_LIMIT' => lateArrivalLimit,
+    'OVERDUE' => overdue,
+    'MISSING' => missing,
+    _ => other,
+  };
+}
+
+/// One active freeze on my approval rights, with the loan that caused it
+/// (US-06). Staff lift it from the web admin.
+class ApprovalFreeze {
+  const ApprovalFreeze({
+    required this.id,
+    required this.reason,
+    this.frozenAt,
+    this.loanId,
+    this.loanNo,
+    this.assetCode,
+    this.assetName,
+    this.studentName,
+  });
+
+  final String id;
+  final FreezeReason reason;
+  final DateTime? frozenAt;
+  final String? loanId;
+  final String? loanNo;
+  final String? assetCode;
+  final String? assetName;
+
+  /// Null for an event loan, which has a coordinator instead.
+  final String? studentName;
+
+  /// "Epson Projector (PRJ-0012)", falling back to the code or loan number.
+  String? get item {
+    final name = assetName;
+    final code = assetCode;
+    if (name == null || name.isEmpty) return code ?? loanNo;
+    return code == null || code.isEmpty ? name : '$name ($code)';
+  }
+}
+
+/// What `GET /approvals/pending` returns: the requests, and the freezes on
+/// my approval rights (FR-2.3, US-06).
 class PendingApprovals {
-  const PendingApprovals({required this.items, this.frozen = false});
+  const PendingApprovals({
+    required this.items,
+    this.frozen = false,
+    this.freezes = const [],
+  });
 
   static const empty = PendingApprovals(items: []);
 
   final List<PendingApproval> items;
+
+  /// Newest first. Can be empty while [frozen] if the server sent no
+  /// details.
+  final List<ApprovalFreeze> freezes;
+
+  /// True while staff have frozen my approval rights.
   final bool frozen;
 
-  PendingApprovals without(String id) => PendingApprovals(
-    frozen: frozen,
-    items: [
-      for (final r in items)
-        if (r.id != id) r,
-    ],
-  );
+  /// The same freezes with [items] instead.
+  PendingApprovals _withItems(List<PendingApproval> items) =>
+      PendingApprovals(items: items, frozen: frozen, freezes: freezes);
+
+  PendingApprovals without(String id) => _withItems([
+    for (final r in items)
+      if (r.id != id) r,
+  ]);
 
   /// With request [id] replaced by `update(request)`.
   PendingApprovals updating(
     String id,
     PendingApproval Function(PendingApproval) update,
-  ) => PendingApprovals(
-    frozen: frozen,
-    items: [for (final r in items) r.id == id ? update(r) : r],
-  );
+  ) => _withItems([for (final r in items) r.id == id ? update(r) : r]);
 
   /// This list plus the requests from [shown] that had expired by [now] and
   /// are missing here. The server leaves expired requests out, but they
@@ -168,19 +231,14 @@ class PendingApprovals {
       for (final r in shown.items)
         if (r.isExpired(now) && !ids.contains(r.id)) r,
     ];
-    return expired.isEmpty
-        ? this
-        : PendingApprovals(frozen: frozen, items: [...expired, ...items]);
+    return expired.isEmpty ? this : _withItems([...expired, ...items]);
   }
 
   /// Every request's timestamps moved by [offset]; see
   /// [PendingApproval.shifted].
   PendingApprovals shifted(Duration offset) => offset == Duration.zero
       ? this
-      : PendingApprovals(
-          frozen: frozen,
-          items: [for (final r in items) r.shifted(offset)],
-        );
+      : _withItems([for (final r in items) r.shifted(offset)]);
 }
 
 /// What the instructor chose when approving a request.
