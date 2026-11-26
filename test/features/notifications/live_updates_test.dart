@@ -232,9 +232,8 @@ void main() {
     expect(h.approvals.pendingCalls, before + 2);
   });
 
-  testWidgets('warnings, anomalies and overdue reload Alerts and My Loans', (
-    tester,
-  ) async {
+  testWidgets('warnings, anomalies and overdue reload Alerts, My Loans and '
+      'the pending list, since they can freeze', (tester) async {
     final h = await _start(tester);
     h.signIn(_fresh);
     await tester.pump();
@@ -245,10 +244,12 @@ void main() {
       'anomaly.resolved',
       'loan.overdue',
     ]) {
+      final approvals = h.approvals.pendingCalls;
       final alerts = h.alerts.listedPages.length;
       final loans = h.loans.listCalls;
       h.last.send(event);
       await tester.pump();
+      expect(h.approvals.pendingCalls, approvals + 1, reason: event);
       expect(h.alerts.listedPages, hasLength(alerts + 1), reason: event);
       expect(h.loans.listCalls, loans + 1, reason: event);
     }

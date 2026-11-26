@@ -172,10 +172,10 @@ class LiveUpdates {
       case 'instructor.frozen' || 'instructor.unfrozen':
         _ref.invalidate(approvalsControllerProvider);
       default:
-        // Warnings, anomalies and overdue loans: a new alert, and a loan's
-        // live status changed.
-        _ref.invalidate(alertsControllerProvider);
-        _ref.invalidate(myLoansProvider);
+        // Warnings, anomalies and overdue loans: a new alert, a loan's live
+        // status changed, and maybe a freeze, in case `instructor.frozen`
+        // doesn't come with it.
+        _reloadAll();
     }
   }
 
