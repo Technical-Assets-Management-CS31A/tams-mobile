@@ -85,8 +85,8 @@ class PushNotifications {
 
   /// The user tapped the system notification.
   void _opened(RemoteMessage message) {
-    // A notice reloads Alerts once it is marked read; anything else now.
-    if (noticeId(message.data) == null) _refreshData(message);
+    // A notice reloads Alerts once it is marked read; the rest reloads now.
+    _refreshData(message, alerts: noticeId(message.data) == null);
     _view(message, locationForPush(message.data));
   }
 
@@ -109,13 +109,16 @@ class PushNotifications {
   }
 
   /// A new request or notice means the cached list it belongs to is stale.
-  void _refreshData(RemoteMessage message) {
+  /// [alerts] false leaves Alerts to [_markRead].
+  void _refreshData(RemoteMessage message, {bool alerts = true}) {
     // Overdue, missing and late arrival notices can freeze my approvals;
     // the banner comes with the pending list.
     if (message.data['type'] case 'approval.requested' || noticePushType) {
       _ref.invalidate(approvalsControllerProvider);
     }
-    if (isAlertPush(message.data)) _ref.invalidate(alertsControllerProvider);
+    if (alerts && isAlertPush(message.data)) {
+      _ref.invalidate(alertsControllerProvider);
+    }
     // Overdue, anomaly and new-loan pushes change a loan's live status.
     if (isLoanPush(message.data)) _ref.invalidate(myLoansProvider);
   }
