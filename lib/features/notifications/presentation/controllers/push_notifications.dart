@@ -110,7 +110,9 @@ class PushNotifications {
 
   /// A new request or notice means the cached list it belongs to is stale.
   void _refreshData(RemoteMessage message) {
-    if (message.data['type'] == 'approval.requested') {
+    // Overdue, missing and late arrival notices can freeze my approvals;
+    // the banner comes with the pending list.
+    if (message.data['type'] case 'approval.requested' || noticePushType) {
       _ref.invalidate(approvalsControllerProvider);
     }
     if (isAlertPush(message.data)) _ref.invalidate(alertsControllerProvider);
