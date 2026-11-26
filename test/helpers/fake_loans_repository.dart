@@ -15,6 +15,9 @@ class FakeLoansRepository implements LoansRepository {
   /// ([LoanHistoryFilter.status]); [loans] when unset.
   List<LoanDetail>? history;
   int historyPageSize = 25;
+
+  /// The `total` Loan History reports; the matching loans when unset.
+  int? historyTotal;
   final historyCalls = <(LoanHistoryFilter, int)>[];
 
   @override
@@ -43,7 +46,7 @@ class FakeLoansRepository implements LoansRepository {
     final start = (page - 1) * historyPageSize;
     return LoansPage(
       items: matching.skip(start).take(historyPageSize).toList(),
-      total: matching.length,
+      total: historyTotal ?? matching.length,
       page: page,
     );
   }

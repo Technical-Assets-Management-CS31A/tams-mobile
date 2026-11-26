@@ -170,6 +170,48 @@ void main() {
       expect(find.byType(CircularProgressIndicator), findsNothing);
     });
 
+    FakeLoansRepository fiveLoans() => FakeLoansRepository()
+      ..historyPageSize = 3
+      ..history = [
+        for (var i = 0; i < 5; i++)
+          openLoan(
+            'l$i',
+            dueAt: now.subtract(Duration(days: i + 1)),
+            status: 'RETURNED',
+            assetName: 'Item $i',
+          ),
+      ];
+
+    Future<void> scrollToEnd(WidgetTester tester) async {
+      await tester.scrollUntilVisible(
+        find.text('Item 4'),
+        300,
+        scrollable: find
+            .descendant(
+              of: find.byType(ListView),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('an empty page ends the list, even short of the total', (
+      tester,
+    ) async {
+      // A loan counted in the total but skipped as a repeat.
+      final repo = fiveLoans()..historyTotal = 6;
+      await pump(tester, repo);
+      await scrollToEnd(tester);
+
+      expect(repo.historyCalls, [
+        (LoanHistoryFilter.all, 1),
+        (LoanHistoryFilter.all, 2),
+        (LoanHistoryFilter.all, 3),
+      ]);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+    });
+
     testWidgets('an error offers a retry', (tester) async {
       final repo = FakeLoansRepository()..error = const Failure('Offline.');
       await pump(tester, repo);
