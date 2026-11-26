@@ -182,6 +182,81 @@ void main() {
     expect(pressed(tester, const Key('sync-now')), isNull);
   });
 
+  /// Four rooms, one per page.
+  void pagedRooms() {
+    server
+      ..roomsPageSize = 1
+      ..roomList.setAll(0, [
+        for (var i = 1; i <= 2; i++)
+          AuditRoom(id: 'room-$i', code: 'R$i', name: 'Room $i'),
+      ])
+      ..roomList.addAll([
+        for (var i = 3; i <= 4; i++)
+          AuditRoom(id: 'room-$i', code: 'R$i', name: 'Room $i'),
+      ]);
+  }
+
+  testWidgets("a search mid-page still loads the search's pages", (
+    tester,
+  ) async {
+    pagedRooms();
+    final held = Completer<void>();
+    server.beforeRooms = (query, page) async {
+      if (query.isEmpty && page == 2) await held.future;
+    };
+    await pumpRooms(tester, settle: false);
+    for (var i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    // The unfiltered list's page 2 is under way and stays open.
+    expect(server.roomsCalls.last, ('', 2));
+
+    await tester.enterText(find.byType(TextField), 'room');
+    for (var i = 0; i < 10; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+
+    expect(server.roomsCalls, contains(('room', 2)));
+
+    held.complete();
+    await tester.pumpAndSettle();
+    expect(server.roomsCalls.last, ('room', 4));
+  });
+
+  testWidgets('a failed page offers a retry instead of spinning', (
+    tester,
+  ) async {
+    pagedRooms();
+    var failing = true;
+    server.beforeRooms = (query, page) async {
+      if (page == 2 && failing) throw unreachable;
+    };
+    await pumpRooms(tester);
+
+    final retry = find.byKey(const ValueKey('rooms-load-more-retry'));
+    await tester.scrollUntilVisible(
+      retry,
+      300,
+      scrollable: find
+          .descendant(
+            of: find.byType(ListView),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    final calls = server.roomsCalls.length;
+    await tester.pump(const Duration(seconds: 1));
+    // Nothing retries on its own while the row shows.
+    expect(server.roomsCalls, hasLength(calls));
+
+    failing = false;
+    await tester.tap(retry);
+    await tester.pumpAndSettle();
+    expect(retry, findsNothing);
+    expect(server.roomsCalls.last, ('', 4));
+  });
+
   testWidgets('searching filters the rooms', (tester) async {
     await pumpRooms(tester);
 

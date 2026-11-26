@@ -145,6 +145,16 @@ class _AuditScreenState extends ConsumerState<AuditScreen> {
       itemCount: rooms.length + (state.hasMore ? 1 : 0),
       separatorBuilder: (_, _) => const SizedBox(height: 12),
       itemBuilder: (context, i) {
+        if (i == rooms.length && state.moreFailed) {
+          return Center(
+            child: TextButton.icon(
+              key: const ValueKey('rooms-load-more-retry'),
+              onPressed: _rooms.loadMore,
+              icon: const Icon(Icons.refresh),
+              label: const Text("Couldn't load more. Try again"),
+            ),
+          );
+        }
         if (i == rooms.length) {
           WidgetsBinding.instance.addPostFrameCallback(
             (_) => _rooms.loadMore(),
