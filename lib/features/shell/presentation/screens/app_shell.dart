@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../alerts/presentation/controllers/alerts_controller.dart';
+import '../../../approvals/presentation/controllers/approvals_controller.dart';
 import '../../../audit/presentation/controllers/audit_providers.dart';
 import '../../../audit/presentation/controllers/audit_sync_controller.dart';
 import '../../../auth/domain/entities/user_role.dart';
@@ -86,6 +87,9 @@ class _AppShellState extends ConsumerState<AppShell> {
         ref.read(alertsControllerProvider.notifier).refresh();
         // Statuses and countdowns moved on while the app was away.
         ref.invalidate(myLoansProvider);
+        // A lifted freeze sends no push, and the banner comes with the
+        // pending list; requests pushed but never tapped are missing too.
+        ref.invalidate(approvalsControllerProvider);
         ref.read(auditSyncControllerProvider.notifier).syncNow();
         // The OS may have dropped the hub's socket while away.
         ref.read(liveUpdatesProvider).resume();

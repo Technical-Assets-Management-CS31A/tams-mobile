@@ -45,6 +45,7 @@ class _FakeAuth extends AuthController {
 Future<GoRouter> _pumpShell(
   WidgetTester tester, {
   FakeAlertsRepository? alerts,
+  FakeApprovalsRepository? approvals,
   _FakeAuth? auth,
   AuditDatabase? database,
   FakeAuditRepository? server,
@@ -59,7 +60,7 @@ Future<GoRouter> _pumpShell(
       // No pending requests, so every tab shows its empty state.
       overrides: [
         approvalsRepositoryProvider.overrideWithValue(
-          FakeApprovalsRepository(),
+          approvals ?? FakeApprovalsRepository(),
         ),
         alertsRepositoryProvider.overrideWithValue(
           alerts ?? FakeAlertsRepository(),
@@ -168,6 +169,25 @@ void main() {
 
     expect(find.text('No pending approvals'), findsOneWidget, reason: 'tab');
     expect(find.descendant(of: badge, matching: find.text('2')), findsOne);
+  });
+
+  testWidgets('coming back to the app reloads Pending Approvals and the '
+      'freezes', (tester) async {
+    final approvals = FakeApprovalsRepository();
+    await _pumpShell(tester, approvals: approvals);
+    expect(approvals.pendingCalls, 1);
+
+    // A freeze lifted while away sends no push.
+    final binding = tester.binding;
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+
+    expect(approvals.pendingCalls, 2);
   });
 
   testWidgets('no badge when everything is read', (tester) async {

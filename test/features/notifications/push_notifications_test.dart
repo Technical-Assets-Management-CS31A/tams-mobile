@@ -242,6 +242,18 @@ void main() {
       expect(h.alerts.listedPages, [1, 1]);
     });
 
+    testWidgets('a notice reloads Pending Approvals, which it can freeze', (
+      tester,
+    ) async {
+      final h = await _pump(tester);
+      expect(h.approvals.pendingCalls, 1);
+
+      h.messaging.opened.add(_notice());
+      await tester.pumpAndSettle();
+
+      expect(h.approvals.pendingCalls, 2);
+    });
+
     testWidgets('one that launched the app is marked read once the session '
         'is restored', (tester) async {
       final h = await _pump(
