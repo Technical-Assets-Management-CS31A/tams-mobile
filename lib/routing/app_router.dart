@@ -12,6 +12,7 @@ import '../features/auth/domain/entities/user_role.dart';
 import '../features/auth/presentation/controllers/auth_controller.dart';
 import '../features/auth/presentation/screens/login_screen.dart';
 import '../features/loans/presentation/screens/loan_detail_screen.dart';
+import '../features/loans/presentation/screens/loan_history_screen.dart';
 import '../features/loans/presentation/screens/my_loans_screen.dart';
 import '../features/shell/presentation/screens/app_shell.dart';
 import '../features/splash/presentation/controllers/app_ready_provider.dart';
@@ -111,6 +112,12 @@ StatefulShellRoute shellRoute({GlobalKey<NavigatorState>? rootNavigatorKey}) =>
           '/loans',
           const MyLoansScreen(),
           routes: [
+            // Before ':loanId', which would otherwise match "history".
+            GoRoute(
+              path: 'history',
+              parentNavigatorKey: rootNavigatorKey,
+              builder: (_, _) => const LoanHistoryScreen(),
+            ),
             GoRoute(
               path: ':loanId',
               parentNavigatorKey: rootNavigatorKey,

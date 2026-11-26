@@ -94,6 +94,12 @@ class _NoLoans implements LoansRepository {
       throw const Failure('Offline in tests.');
 
   @override
+  Future<LoansPage> myLoanHistory({
+    LoanHistoryFilter filter = LoanHistoryFilter.all,
+    int page = 1,
+  }) async => throw const Failure('Offline in tests.');
+
+  @override
   Future<LoanDetail> detail(String id) async =>
       throw const Failure('Offline in tests.');
 }

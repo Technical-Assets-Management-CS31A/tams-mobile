@@ -3,6 +3,9 @@
 String alertLoanLocation(String loanId) =>
     '/alerts/loans/${Uri.encodeComponent(loanId)}';
 
+/// Loan History (FR-2.5), opened from My Loans; back returns there.
+const loanHistoryLocation = '/loans/history';
+
 /// Loan [loanId], opened from My Loans; back returns there.
 String myLoanLocation(String loanId) => '/loans/${Uri.encodeComponent(loanId)}';
 

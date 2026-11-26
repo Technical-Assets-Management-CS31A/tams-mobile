@@ -156,7 +156,7 @@ class LoanDetail {
 
 /// A page of `GET /loans`.
 class LoansPage {
-  const LoansPage({required this.items, required this.total});
+  const LoansPage({required this.items, required this.total, this.page = 1});
 
   static const empty = LoansPage(items: [], total: 0);
 
@@ -164,4 +164,22 @@ class LoansPage {
 
   /// Matching loans across all pages; more than [items] when cut off.
   final int total;
+
+  /// Which page this is, from 1.
+  final int page;
+}
+
+/// The filter chips of Loan History (FR-2.5), each a `status` the loans
+/// API takes; [all] sends none.
+enum LoanHistoryFilter {
+  all(null, 'All'),
+  open('open', 'Open'),
+  returned('RETURNED', 'Returned'),
+  missing('MISSING', 'Missing'),
+  cancelled('CANCELLED', 'Cancelled');
+
+  const LoanHistoryFilter(this.status, this.label);
+
+  final String? status;
+  final String label;
 }

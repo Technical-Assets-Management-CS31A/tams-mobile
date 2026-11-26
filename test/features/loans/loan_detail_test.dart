@@ -68,6 +68,12 @@ class _FakeLoans implements LoansRepository {
   Future<LoansPage> myOpenLoans() async => LoansPage.empty;
 
   @override
+  Future<LoansPage> myLoanHistory({
+    LoanHistoryFilter filter = LoanHistoryFilter.all,
+    int page = 1,
+  }) async => LoansPage.empty;
+
+  @override
   Future<LoanDetail> detail(String id) async {
     if (error case final e?) throw e;
     return result!;

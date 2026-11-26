@@ -11,11 +11,41 @@ class FakeLoansRepository implements LoansRepository {
   Object? error;
   int listCalls = 0;
 
+  /// Loan History: every loan, open or closed, by `status`
+  /// ([LoanHistoryFilter.status]); [loans] when unset.
+  List<LoanDetail>? history;
+  int historyPageSize = 25;
+  final historyCalls = <(LoanHistoryFilter, int)>[];
+
   @override
   Future<LoansPage> myOpenLoans() async {
     listCalls++;
     if (error case final e?) throw e;
     return LoansPage(items: [...loans], total: loans.length);
+  }
+
+  @override
+  Future<LoansPage> myLoanHistory({
+    LoanHistoryFilter filter = LoanHistoryFilter.all,
+    int page = 1,
+  }) async {
+    historyCalls.add((filter, page));
+    if (error case final e?) throw e;
+    final matching = [
+      for (final l in history ?? loans)
+        if (switch (filter.status) {
+          null => true,
+          'open' => l.isOpen,
+          final s => l.status == s,
+        })
+          l,
+    ];
+    final start = (page - 1) * historyPageSize;
+    return LoansPage(
+      items: matching.skip(start).take(historyPageSize).toList(),
+      total: matching.length,
+      page: page,
+    );
   }
 
   @override
@@ -38,6 +68,7 @@ LoanDetail openLoan(
   String assetName = 'Epson Projector',
   DateTime? transitDeadlineAt,
   int graceMinutes = 15,
+  DateTime? returnedAt,
 }) => LoanDetail(
   id: id,
   loanNo: 'L-$id',
@@ -55,4 +86,5 @@ LoanDetail openLoan(
   classEndsAt: dueAt.subtract(Duration(minutes: graceMinutes)),
   graceMinutes: graceMinutes,
   dueAt: dueAt,
+  returnedAt: returnedAt,
 );

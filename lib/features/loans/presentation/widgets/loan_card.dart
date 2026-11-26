@@ -3,8 +3,9 @@ import 'package:flutter/material.dart';
 import '../../../../core/utils/time_format.dart';
 import '../../domain/entities/loan_detail.dart';
 
-/// A row of My Loans: the item, who has it and where, its live status, and
-/// the countdown to when it is due back (grace included).
+/// A row of My Loans or Loan History: the item, who has it and where, its
+/// live status, and the countdown to when it is due back (grace included).
+/// A closed loan says when it ended instead.
 class LoanCard extends StatelessWidget {
   const LoanCard({
     super.key,
@@ -72,6 +73,10 @@ class LoanCard extends StatelessWidget {
                 const SizedBox(height: 8),
                 transit,
               ],
+              if (_ended(context) case final ended?) ...[
+                const SizedBox(height: 12),
+                ended,
+              ],
             ],
           ),
         ),
@@ -83,9 +88,7 @@ class LoanCard extends StatelessWidget {
   Widget? _countdown(BuildContext context, LoanLiveStatus status) {
     final due = loan.dueAt;
     final left = loan.dueIn(now);
-    if (due == null || left == null || status == LoanLiveStatus.missing) {
-      return null;
-    }
+    if (!loan.isOpen || due == null || left == null) return null;
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
     final overdue = status == LoanLiveStatus.overdue;
@@ -138,6 +141,36 @@ class LoanCard extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+
+  /// For a closed loan: "Checked out 18 Nov, 1:00 PM · returned 3:05 PM".
+  Widget? _ended(BuildContext context) {
+    if (loan.isOpen) return null;
+    final theme = Theme.of(context);
+    final out = loan.checkedOutAt;
+    String sameDay(DateTime at) =>
+        DateUtils.isSameDay(at.toLocal(), out.toLocal())
+        ? formatClock(at)
+        : formatDateTime(at, now: now);
+    final end = switch (loan.status) {
+      'RETURNED' =>
+        loan.returnedAt == null
+            ? 'returned'
+            : 'returned ${sameDay(loan.returnedAt!)}',
+      'MISSING' =>
+        loan.missingAt == null
+            ? 'marked missing'
+            : 'marked missing ${sameDay(loan.missingAt!)}',
+      'CANCELLED' => 'cancelled',
+      _ => null,
+    };
+    return Text(
+      ['Checked out ${formatDateTime(out, now: now)}', ?end].join(' · '),
+      key: ValueKey('ended-${loan.id}'),
+      style: theme.textTheme.bodySmall?.copyWith(
+        color: theme.colorScheme.onSurfaceVariant,
+      ),
     );
   }
 
