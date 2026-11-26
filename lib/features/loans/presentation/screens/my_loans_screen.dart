@@ -23,8 +23,10 @@ class MyLoansScreen extends ConsumerStatefulWidget {
   const MyLoansScreen({super.key});
 
   /// How often the list is fetched again while it is on screen, so
-  /// check-ins at the room show up without pulling to refresh. Pushes and
-  /// resuming the app reload it sooner.
+  /// check-ins at the room show up without pulling to refresh. The live
+  /// hub doesn't send those to instructors (only `asset.statusChanged` to
+  /// staff), so this stays. Live events, pushes and resuming the app
+  /// reload it sooner.
   static const pollEvery = Duration(minutes: 1);
 
   @override
