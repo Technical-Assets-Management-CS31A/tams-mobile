@@ -12,12 +12,14 @@ class LoanHistory {
     required this.items,
     required this.total,
     required this.page,
+    this.reachedEnd = false,
   });
 
   LoanHistory.first(this.filter, LoansPage page)
     : items = page.items,
       total = page.total,
-      page = page.page;
+      page = page.page,
+      reachedEnd = page.items.isEmpty;
 
   final LoanHistoryFilter filter;
   final List<LoanDetail> items;
@@ -28,7 +30,12 @@ class LoanHistory {
   /// The last page loaded, from 1.
   final int page;
 
-  bool get hasMore => items.length < total;
+  /// The server sent an empty page: there is nothing after [page].
+  final bool reachedEnd;
+
+  /// [items] can stay short of [total] for good (a checkout between page
+  /// loads repeats a loan, which is skipped), so an empty page also ends it.
+  bool get hasMore => !reachedEnd && items.length < total;
 
   /// With [next] added, skipping loans already listed (a checkout between
   /// two page loads shifts every page down by one).
@@ -43,6 +50,7 @@ class LoanHistory {
       ],
       total: next.total,
       page: next.page,
+      reachedEnd: next.items.isEmpty,
     );
   }
 }
