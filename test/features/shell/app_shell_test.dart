@@ -11,6 +11,8 @@ import 'package:tams_mobile/features/auth/domain/entities/user.dart';
 import 'package:tams_mobile/features/auth/domain/entities/user_role.dart';
 import 'package:tams_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:tams_mobile/features/loans/presentation/controllers/loan_detail_provider.dart';
+import 'package:tams_mobile/features/loans/presentation/screens/loan_detail_screen.dart';
+import 'package:tams_mobile/features/loans/presentation/screens/loan_history_screen.dart';
 import 'package:tams_mobile/features/shell/presentation/widgets/shell_header.dart';
 import 'package:tams_mobile/routing/app_router.dart';
 
@@ -78,6 +80,20 @@ Future<GoRouter> _pumpShell(
 }
 
 void main() {
+  testWidgets('History on My Loans opens Loan History, not a loan', (
+    tester,
+  ) async {
+    final router = await _pumpShell(tester);
+    router.go('/loans');
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const Key('loan-history')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(LoanHistoryScreen), findsOneWidget);
+    expect(find.byType(LoanDetailScreen), findsNothing);
+  });
+
   testWidgets('opens on Approvals with its empty state', (tester) async {
     await _pumpShell(tester);
 

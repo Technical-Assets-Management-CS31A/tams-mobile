@@ -15,7 +15,8 @@ import '../widgets/loan_card.dart';
 /// My Loans (PRD 6.6, FR-2.5): the open loans I approved, each with its
 /// live status (At Counter, In Transit, Verified in Room, Overdue) and a
 /// countdown to when it is due back, grace included. Overdue and other
-/// urgent loans come first, then the soonest due.
+/// urgent loans come first, then the soonest due. History lists every loan
+/// I approved, past ones included.
 class MyLoansScreen extends ConsumerStatefulWidget {
   const MyLoansScreen({super.key});
 
@@ -67,6 +68,27 @@ class _MyLoansScreenState extends ConsumerState<MyLoansScreen> {
     final now = ref.watch(clockProvider)();
     _tick(state.value?.items.isNotEmpty ?? false);
 
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              key: const Key('loan-history'),
+              onPressed: () => context.push(loanHistoryLocation),
+              icon: const Icon(Icons.history),
+              label: const Text('History'),
+            ),
+          ),
+        ),
+        Expanded(child: _body(state, now)),
+      ],
+    );
+  }
+
+  Widget _body(AsyncValue<LoansPage> state, DateTime now) {
     return switch (state) {
       AsyncValue(:final value?) => RefreshIndicator(
         onRefresh: _reload,
@@ -107,7 +129,7 @@ class _MyLoansScreenState extends ConsumerState<MyLoansScreen> {
     final hidden = page.total - loans.length;
     return ListView.separated(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
       itemCount: loans.length + (hidden > 0 ? 1 : 0),
       separatorBuilder: (_, _) => const SizedBox(height: 10),
       itemBuilder: (context, i) {

@@ -35,6 +35,34 @@ class LoansRepositoryImpl implements LoansRepository {
     }
   }
 
+  /// Loan History pages: small enough to load quickly, with "Load more".
+  static const historyPageSize = 25;
+
+  @override
+  Future<LoansPage> myLoanHistory({
+    LoanHistoryFilter filter = LoanHistoryFilter.all,
+    int page = 1,
+  }) async {
+    try {
+      final res = await _dio.get<Object?>(
+        '/loans',
+        queryParameters: {
+          'approvedBy': 'me',
+          'status': ?filter.status,
+          'sort': '-checkedOutAt',
+          'page': page,
+          'pageSize': historyPageSize,
+        },
+      );
+      final parsed = parseLoansPage(res.data, baseUrl: _dio.options.baseUrl);
+      return LoansPage(items: parsed.items, total: parsed.total, page: page);
+    } on DioException catch (e) {
+      throw Failure.fromDio(e);
+    } on FormatException {
+      throw const Failure('Unexpected response from the server.');
+    }
+  }
+
   @override
   Future<LoanDetail> detail(String id) async {
     try {
