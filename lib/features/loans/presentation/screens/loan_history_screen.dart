@@ -99,6 +99,16 @@ class LoanHistoryScreen extends ConsumerWidget {
       itemCount: loans.length + (history.hasMore ? 1 : 0),
       separatorBuilder: (_, _) => const SizedBox(height: 10),
       itemBuilder: (context, i) {
+        if (i == loans.length && history.moreFailed) {
+          return Center(
+            child: TextButton.icon(
+              key: const ValueKey('history-load-more-retry'),
+              onPressed: controller.loadMore,
+              icon: const Icon(Icons.refresh),
+              label: const Text("Couldn't load more. Try again"),
+            ),
+          );
+        }
         if (i == loans.length) {
           // Scrolled to the end: fetch the next page.
           WidgetsBinding.instance.addPostFrameCallback(
