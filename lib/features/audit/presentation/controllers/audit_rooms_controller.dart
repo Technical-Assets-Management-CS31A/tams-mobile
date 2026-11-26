@@ -18,6 +18,7 @@ class AuditRoomsState {
     this.reachedEnd = false,
     this.cached = false,
     this.notice,
+    this.moreFailed = false,
   });
 
   final List<AuditRoom> rooms;
@@ -27,6 +28,9 @@ class AuditRoomsState {
   final bool reachedEnd;
   final bool cached;
   final String? notice;
+
+  /// Loading the page after [page] failed; the screen offers a retry.
+  final bool moreFailed;
 
   bool get hasMore => !cached && !reachedEnd && rooms.length < total;
 
@@ -44,11 +48,26 @@ class AuditRoomsState {
       reachedEnd: next.items.isEmpty,
     );
   }
+
+  AuditRoomsState withMoreFailed(bool failed) => AuditRoomsState(
+    rooms: rooms,
+    query: query,
+    page: page,
+    total: total,
+    reachedEnd: reachedEnd,
+    cached: cached,
+    notice: notice,
+    moreFailed: failed,
+  );
 }
 
 class AuditRoomsController extends AsyncNotifier<AuditRoomsState> {
   String _query = '';
-  bool _loadingMore = false;
+
+  /// The list a next page is loading for. Tied to the list, not a flag: a
+  /// search or refresh mid-load shows a new list, which must not wait on
+  /// the old one's page.
+  AuditRoomsState? _loadingMoreFor;
 
   Duration get _limit => ref.read(auditRoomsTimeoutProvider);
 
@@ -144,10 +163,17 @@ class AuditRoomsController extends AsyncNotifier<AuditRoomsState> {
 
   Future<void> refresh() => search(_query);
 
+  /// Adds the next page. A failure keeps the list and marks it
+  /// [AuditRoomsState.moreFailed]; calling this again retries.
   Future<void> loadMore() async {
-    final current = state.value;
-    if (current == null || !current.hasMore || _loadingMore) return;
-    _loadingMore = true;
+    var current = state.value;
+    if (current == null || !current.hasMore) return;
+    if (identical(_loadingMoreFor, current)) return;
+    if (current.moreFailed) {
+      current = current.withMoreFailed(false);
+      state = AsyncData(current);
+    }
+    _loadingMoreFor = current;
     try {
       final next = await ref
           .read(auditRepositoryProvider)
@@ -162,8 +188,11 @@ class AuditRoomsController extends AsyncNotifier<AuditRoomsState> {
       }
     } catch (e) {
       debugPrint('Could not load more rooms: $e');
+      if (ref.mounted && identical(state.value, current)) {
+        state = AsyncData(current.withMoreFailed(true));
+      }
     } finally {
-      _loadingMore = false;
+      if (identical(_loadingMoreFor, current)) _loadingMoreFor = null;
     }
   }
 }

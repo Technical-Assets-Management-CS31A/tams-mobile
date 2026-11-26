@@ -41,6 +41,13 @@ class FakeAuditRepository implements AuditRepository {
   /// When set, room lists wait for it, e.g. a server that never answers.
   Future<void>? roomsAnswer;
 
+  /// Rooms per page; every room on page 1 when unset.
+  int? roomsPageSize;
+  final roomsCalls = <(String, int)>[];
+
+  /// Awaited before each room page is answered, to hold or fail one.
+  Future<void> Function(String query, int page)? beforeRooms;
+
   /// When set, completing an audit waits for it, e.g. a slow submit.
   Future<void>? completeAnswer;
   bool loseNextResponse = false;
@@ -86,7 +93,9 @@ class FakeAuditRepository implements AuditRepository {
 
   @override
   Future<RoomsPage> rooms({String query = '', int page = 1}) async {
+    roomsCalls.add((query, page));
     if (roomsAnswer case final answer?) await answer;
+    await beforeRooms?.call(query, page);
     _reach();
     final q = query.trim().toLowerCase();
     final matching = [
@@ -96,8 +105,11 @@ class FakeAuditRepository implements AuditRepository {
             r.name.toLowerCase().contains(q))
           r,
     ];
+    final size = roomsPageSize;
     return RoomsPage(
-      items: page == 1 ? matching : const [],
+      items: size == null
+          ? (page == 1 ? matching : const [])
+          : matching.skip((page - 1) * size).take(size).toList(),
       page: page,
       total: matching.length,
     );
