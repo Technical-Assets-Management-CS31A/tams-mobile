@@ -9,6 +9,7 @@ import '../../../audit/presentation/controllers/audit_sync_controller.dart';
 import '../../../auth/domain/entities/user_role.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../../loans/presentation/controllers/loan_detail_provider.dart';
+import '../../../notifications/presentation/controllers/live_updates.dart';
 import '../widgets/shell_header.dart';
 import '../widgets/sign_out_sheet.dart';
 
@@ -86,6 +87,8 @@ class _AppShellState extends ConsumerState<AppShell> {
         // Statuses and countdowns moved on while the app was away.
         ref.invalidate(myLoansProvider);
         ref.read(auditSyncControllerProvider.notifier).syncNow();
+        // The OS may have dropped the hub's socket while away.
+        ref.read(liveUpdatesProvider).resume();
       },
     );
   }
