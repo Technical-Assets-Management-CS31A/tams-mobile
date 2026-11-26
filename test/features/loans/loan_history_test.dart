@@ -216,9 +216,9 @@ void main() {
       final repo = await pump(tester, fiveLoans());
       await scrollToEnd(tester);
 
-      ProviderScope.containerOf(
-        tester.element(find.byType(LoanHistoryScreen)),
-      ).read(authTokenProvider.notifier).set('renewed-token');
+      ProviderScope.containerOf(tester.element(find.byType(LoanHistoryScreen)))
+          .read(authTokenProvider.notifier)
+          .set('renewed-token');
       await tester.pumpAndSettle();
 
       expect(repo.historyCalls, [
