@@ -1,6 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'dart:async';
+
 import 'package:tams_mobile/core/errors/failures.dart';
+import 'package:tams_mobile/core/network/token_provider.dart';
 import 'package:tams_mobile/features/approvals/domain/entities/pending_approval.dart';
 import 'package:tams_mobile/features/approvals/domain/repositories/approvals_repository.dart';
 import 'package:tams_mobile/features/approvals/presentation/controllers/approvals_controller.dart';
@@ -9,6 +13,7 @@ import 'package:tams_mobile/features/approvals/presentation/widgets/countdown.da
 import 'package:tams_mobile/features/approvals/presentation/widgets/freeze_banner.dart';
 import 'package:tams_mobile/features/approvals/presentation/widgets/student_avatar.dart';
 
+import '../../helpers/fake_alerts_repository.dart' show SignedInToken;
 import '../../helpers/fake_approvals_repository.dart';
 
 void main() {
@@ -190,7 +195,10 @@ void main() {
         approval('c'),
       ]);
       container = ProviderContainer(
-        overrides: [approvalsRepositoryProvider.overrideWithValue(repo)],
+        overrides: [
+          approvalsRepositoryProvider.overrideWithValue(repo),
+          authTokenProvider.overrideWith(SignedInToken.new),
+        ],
       );
       addTearDown(container.dispose);
     });
@@ -294,6 +302,7 @@ void main() {
         container = ProviderContainer(
           overrides: [
             approvalsRepositoryProvider.overrideWithValue(repo),
+            authTokenProvider.overrideWith(SignedInToken.new),
             clockProvider.overrideWithValue(clock.call),
           ],
         );
@@ -337,6 +346,72 @@ void main() {
         controller().dismiss('old');
         await controller().refresh();
         expect(await ids(), ['new']);
+      });
+
+      group('but not into the next session', () {
+        TokenNotifier token() => container.read(authTokenProvider.notifier);
+
+        test('signing out empties the list and the freezes', () async {
+          repo.result = PendingApprovals(
+            items: repo.result.items,
+            frozen: true,
+            freezes: const [
+              ApprovalFreeze(id: 'f', reason: FreezeReason.other),
+            ],
+          );
+          container.listen(approvalsControllerProvider, (_, _) {});
+          expect(await ids(), ['old']);
+          token().clear();
+          final shown = container.read(approvalsControllerProvider);
+          expect(shown.value!.items, isEmpty);
+          expect(shown.value!.frozen, isFalse);
+          expect(shown.isLoading, isFalse);
+        });
+
+        test('while a screen shows the list', () async {
+          container.listen(approvalsControllerProvider, (_, _) {});
+          expect(await ids(), ['old']);
+          serverMovesOn();
+          token().clear();
+          await container.pump();
+          token().set('someone-else');
+          expect(await ids(), ['new']);
+        });
+
+        test('while paused on a hidden tab, with the sign-out read', () async {
+          final screen = container.listen(
+            approvalsControllerProvider,
+            (_, _) {},
+          );
+          expect(await ids(), ['old']);
+          // Its screen's tab is hidden, so nothing listens.
+          screen.close();
+          serverMovesOn();
+          token().clear();
+          // What App does at sign-out.
+          container.read(approvalsControllerProvider);
+          token().set('someone-else');
+          expect(
+            container.read(approvalsControllerProvider).value!.items,
+            isEmpty,
+          );
+          expect(await ids(), ['new']);
+        });
+
+        test('a refresh that finishes after sign-out is dropped', () async {
+          container.listen(approvalsControllerProvider, (_, _) {});
+          expect(await ids(), ['old']);
+          final gate = Completer<void>();
+          repo.pendingGate = gate.future;
+          final refreshing = controller().refresh();
+          token().clear();
+          gate.complete();
+          await refreshing;
+          expect(
+            container.read(approvalsControllerProvider).value!.items,
+            isEmpty,
+          );
+        });
       });
     });
   });

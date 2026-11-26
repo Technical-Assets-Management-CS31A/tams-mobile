@@ -57,6 +57,9 @@ class FakeApprovalsRepository implements ApprovalsRepository {
   /// time pass during the call.
   void Function()? whileDeciding;
 
+  /// [pending] waits for this when set, e.g. to sign out mid-load.
+  Future<void>? pendingGate;
+
   int pendingCalls = 0;
   final approved = <(String, ApprovalDecision)>[];
   final declined = <String>[];
@@ -64,6 +67,7 @@ class FakeApprovalsRepository implements ApprovalsRepository {
   @override
   Future<PendingApprovals> pending() async {
     pendingCalls++;
+    if (pendingGate case final gate?) await gate;
     if (pendingError case final e?) throw e;
     return result;
   }
