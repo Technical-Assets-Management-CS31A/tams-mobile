@@ -1,8 +1,8 @@
 # Deployed Backend – Endpoints for Mobile
 
-Taken from the deployed backend's OpenAPI spec (`/openapi/v1.json`, the one Scalar shows) on 2026-11-22. The backend URL is in `env/prod.json` (git-ignored). It is left out of this file because the repo is public.
+Taken from the deployed backend's OpenAPI spec (`/openapi/v1.json`, the one Scalar shows) on 2026-11-22, and checked again on 2026-11-26 against the spec and the `tams-backend` repo. The backend URL is in `env/prod.json` (git-ignored). It is left out of this file because the repo is public.
 
-The spec lists 137 endpoints. About 30 are useful to the mobile app. The rest are for the web admin, the kiosk or the room stations.
+The spec lists 142 endpoints (137 on 2026-11-22). The new ones are `GET /auth/me` and the kiosk card enrollment endpoints (`/auth-cards/enrollment`). About 30 are useful to the mobile app. The rest are for the web admin, the kiosk or the room stations.
 
 Good to know:
 
@@ -46,18 +46,19 @@ These match unchecked items in [mobile-phase-plan.md](mobile-phase-plan.md). Che
 - [x] `POST /auth/refresh` with `{refreshToken}` – renew the 15-minute token instead of signing out (NFR-9).
 - [ ] `POST /auth/logout` with an optional `{refreshToken}` – cancel the refresh token on sign-out.
 - [ ] `POST /auth/change-password` with `{currentPassword, newPassword}` – change password screen. Not in the PRD; nice to have.
+- [x] `GET /auth/me` – the signed-in user (`UserDto`: id, email, name, role, default room). New on 2026-11-25. The app calls it to renew an expiring token before it connects to the live hub. It could also refresh the user's name and role on start.
 
 ### Push notifications (Phase 2)
 
 This was the Phase 2 blocker. The endpoints now exist.
 
-- [ ] `POST /device-tokens` with `{token, platform}` – send the phone's push token to the backend (FR-2.1, O3).
+- [ ] `POST /device-tokens` with `{token, platform}` – send the phone's push token to the backend (FR-2.1, O3). `platform` is `ANDROID`, `IOS` or `WEB`. The backend pushes approval requests and every stored notice (late arrival, overdue, missing, anomaly) to the tokens it has. A user with no token gets no pushes.
 - [ ] `POST /device-tokens/unregister` with `{token}` – stop pushes to this phone on sign-out.
 
 ### Loans and freezes (Phase 3)
 
-- [ ] `GET /loans?approvedBy=me&status=...&page=` – past loan history with a status filter (FR-2.5). It also takes `q`, `roomId`, `studentId`, `assetId` and `sort`.
-- [ ] Read the `freezes` array from `GET /approvals/pending` – a freeze banner that names the item and the student (US-06). The response already has this data; the app just doesn't read it yet.
+- [x] `GET /loans?approvedBy=me&status=...&sort=-checkedOutAt&page=` – Loan History with a status filter (FR-2.5). `status` takes `open`, `ACTIVE`, `OVERDUE`, `RETURNED`, `MISSING` or `CANCELLED`; `sort` takes `checkedOutAt` or `dueAt`, with `-` for newest first. It also takes `q`, `roomId`, `studentId`, `assetId` and `type`.
+- [x] Read the `freezes` array from `GET /approvals/pending` – a freeze banner that names the item and the student (US-06). Each freeze has `id`, `reason` (`LATE_ARRIVAL_LIMIT`, `OVERDUE` or `MISSING`), `frozenAt`, `loanId`, `loanNo`, `assetCode`, `assetName` and `studentName`.
 
 ### Offline QR audit (Phase 4)
 
@@ -88,8 +89,9 @@ The spec doesn't cover these.
 
 - [ ] **Response shapes.** The spec documents no 200 responses. Get a sample of the login, `/loans` and `/audits/{id}` responses, or ask the team to add response types.
 - [ ] **Roles.** The spec doesn't say which role can call which endpoint. Confirm that instructors can use approvals, loans and notifications, and that custodians can use audits.
-- [ ] **SignalR hub.** WebSocket hubs don't appear in OpenAPI. Confirm whether a hub exists and what its path is. If there isn't one, use push plus polling.
-- [ ] **`platform` values** for `POST /device-tokens`, for example `android` and `ios`.
+- [x] **SignalR hub.** It's at `/hubs/live`, and the JWT goes in `?access_token=`. The hub only sends; it has no methods to call. Each user joins `user:{id}`. Staff (ADMIN, TECH_STAFF, CUSTODIAN) also join `staff`. An instructor receives `approval.requested`, `instructor.frozen`, `instructor.unfrozen`, `warning.issued`, `anomaly.raised`, `anomaly.resolved` and `loan.overdue`, all about their own loans. The app uses it.
+- [ ] **Loan status events for instructors.** `asset.statusChanged` and `loan.created` go to `staff` only, so the app can't see a check-in at the room (In Transit → Verified in Room) until My Loans reloads. Ask for `asset.statusChanged` to also go to the approving instructor's `user:{id}` group (in `LoanRules` and `DeviceEndpoints`). PRD 6.4 lists it for staff dashboards only, so the PRD would need that row too.
+- [x] **`platform` values** for `POST /device-tokens`: `ANDROID`, `IOS` or `WEB` (case doesn't matter).
 - [x] **QR content.** Does a QR label hold only the asset UUID? If so, the app can match it against the roster offline.
 
 ## 5. Not for mobile
@@ -101,7 +103,7 @@ The mobile app doesn't call these. They're listed so nobody wires them up by mis
 - **Web admin, people:** `/users`, `/students`, `/students:import`, `/sections`, `/enrollment`, `/students/{id}/fingerprints`.
 - **Web admin, inventory:** asset create, edit and delete, `/assets/{id}/image`, `/restore`, `/damage-liability`, `/asset-categories`, `/assets/qr-sheet`, `GET /assets/{id}/qr`.
 - **Web admin, rooms and stations:** room create, edit and delete, `POST /rooms/{id}/roster`, station CRUD and `rotate-key`.
-- **Web admin, cards:** `/auth-cards`.
+- **Web admin, cards:** `/auth-cards`, and card enrollment at the kiosk (`/auth-cards/enrollment`, `/auth-cards/enrollment/{id}`, `/auth-cards/enrollment/{id}/cancel`).
 - **Web admin, staff loan actions:** `POST /loans/{id}/mark-missing`, `/return`, `/void`, `PUT /loans/{id}/room`, `PUT /loans/{id}/borrower`.
 - **Web admin, violations:** `/violations`, `/warnings`, `/marks`, `/holds`, `/freezes/{id}/lift`, `/liabilities/{id}/settle`.
 - **Web admin, other:** `/events`, `GET /rooms/{id}/checklist:export`, `POST /audits/import`.
