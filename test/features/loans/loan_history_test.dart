@@ -212,6 +212,22 @@ void main() {
       expect(find.byType(CircularProgressIndicator), findsNothing);
     });
 
+    testWidgets('a renewed token keeps the pages loaded', (tester) async {
+      final repo = await pump(tester, fiveLoans());
+      await scrollToEnd(tester);
+
+      ProviderScope.containerOf(
+        tester.element(find.byType(LoanHistoryScreen)),
+      ).read(authTokenProvider.notifier).set('renewed-token');
+      await tester.pumpAndSettle();
+
+      expect(repo.historyCalls, [
+        (LoanHistoryFilter.all, 1),
+        (LoanHistoryFilter.all, 2),
+      ]);
+      expect(find.text('Item 4'), findsOneWidget);
+    });
+
     testWidgets('an error offers a retry', (tester) async {
       final repo = FakeLoansRepository()..error = const Failure('Offline.');
       await pump(tester, repo);

@@ -67,7 +67,9 @@ class LoanHistoryController extends AsyncNotifier<LoanHistory> {
   @override
   Future<LoanHistory> build() async {
     final repo = ref.watch(loansRepositoryProvider);
-    if (ref.watch(authTokenProvider) == null) {
+    // Signed in or not, not the token itself: a renewed token would
+    // otherwise drop every page after the first.
+    if (!ref.watch(authTokenProvider.select((t) => t != null))) {
       return LoanHistory.first(_filter, LoansPage.empty);
     }
     return LoanHistory.first(
