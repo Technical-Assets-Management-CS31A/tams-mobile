@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:tams_mobile/core/errors/failures.dart';
+import 'package:tams_mobile/core/network/token_provider.dart';
 import 'package:tams_mobile/core/utils/clock.dart';
 import 'package:tams_mobile/features/approvals/domain/entities/pending_approval.dart';
 import 'package:tams_mobile/features/approvals/domain/repositories/approvals_repository.dart';
@@ -9,6 +10,7 @@ import 'package:tams_mobile/features/approvals/presentation/controllers/approval
 import 'package:tams_mobile/features/approvals/presentation/screens/approvals_screen.dart';
 import 'package:tams_mobile/features/approvals/presentation/widgets/student_avatar.dart';
 
+import '../../helpers/fake_alerts_repository.dart' show SignedInToken;
 import '../../helpers/fake_approvals_repository.dart';
 
 Future<FakeApprovalsRepository> _pump(
@@ -35,6 +37,7 @@ Future<FakeApprovalsRepository> _pump(
     ProviderScope(
       overrides: [
         approvalsRepositoryProvider.overrideWithValue(fake),
+        authTokenProvider.overrideWith(SignedInToken.new),
         clockProvider.overrideWithValue((clock ?? FakeClock()).call),
       ],
       child: const MaterialApp(home: Scaffold(body: ApprovalsScreen())),
