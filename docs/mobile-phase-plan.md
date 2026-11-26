@@ -1,6 +1,6 @@
 # TAMS Mobile – Phase Plan
 
-Mobile (Flutter) scope from the PRD (§6.6 screens, F2, F6, F7, §6.4 events, NFR-9/14), checked against the `develop` branch as of 2026-11-22.
+Mobile (Flutter) scope from the PRD (§6.6 screens, F2, F6, F7, §6.4 events, NFR-9/14), checked against the `develop` branch as of 2026-11-26.
 
 `[x]` done · `[ ]` not done · ⚠️ = partly done, see note on the line
 
@@ -36,7 +36,15 @@ Mobile (Flutter) scope from the PRD (§6.6 screens, F2, F6, F7, §6.4 events, NF
 - [x] Push received while the app is open shows a banner with a "View" button
 - [x] Tapping a push opens the right tab or loan
 - [x] `approval.requested` push reloads the Approvals list
-- [ ] **Send the phone's push token to the backend (`device_tokens`) – blocked on a backend endpoint (FR-2.1, O3)**
+- [ ] **Send the phone's push token to the backend (FR-2.1, O3).** No longer blocked: the endpoints are deployed. Until this is done, no pushes reach the phone.
+  - [ ] Once signed in and registered with FCM, send `POST /device-tokens` with `{token, platform}`, where `platform` is `ANDROID` or `IOS`
+  - [ ] Send it again when FCM gives a new token (`onRegistered` fires again) and after every sign-in. The backend moves a token it already has to whoever sends it, so a shared phone follows the last user
+  - [ ] On sign-out, send `POST /device-tokens/unregister` with `{token}` before the session is cleared, since it needs the access token. The backend only removes the caller's own token, and calling it twice is fine
+  - [ ] If either call fails, don't block sign-in or sign-out. Try again on the next app start or sign-in. On `409 DEVICE_TOKEN_CONFLICT`, retry once
+  - [ ] Keep the token out of debug logs (the redacting log interceptor)
+  - [ ] Remove the `TODO` in `PushNotifications._onRegistered`
+  - [ ] Tests: sent on sign-in, sent again when the token changes and for a new user, removed on sign-out, a failed call changes nothing on screen
+  - [ ] On a real phone: a kiosk checkout's approval push arrives within 3 s (FR-2.1, US-04), and a late arrival or overdue notice arrives as a push (US-05)
 - [ ] Reload pending approvals from the server every few seconds while the screen is open, in case a push is missed (Risk: "Instructors miss approval pushes")
 - [ ] Sound on approval push notifications (Risk mitigation, PRD 10.2)
 
@@ -54,10 +62,11 @@ Mobile (Flutter) scope from the PRD (§6.6 screens, F2, F6, F7, §6.4 events, NF
 - [x] Tapping an alert about a loan opens that loan
 - [x] Freeze banner on Approvals, with Approve disabled while frozen (FR-2.3)
 - [x] `INSTRUCTOR_FROZEN` error from the server shown as a clear message
-- [ ] ⚠️ Freeze banner names the item and student that caused the freeze, using the `freezes` array the backend already sends (US-06)
-- [ ] Freeze banner also shown on My Loans (PRD 6.6)
-- [ ] History of past (returned / closed) loans the instructor approved, with a filter (FR-2.5)
-- [ ] Decide with the team: SignalR live updates (PRD 6.1) or keep pushes + 1-minute refresh, and update the PRD
+- [x] Freeze banner names the reason, item and student behind each freeze, from the `freezes` array of `GET /approvals/pending` (US-06)
+- [x] Freeze banner also shown on My Loans (PRD 6.6)
+- [x] Loan History from My Loans: every loan the instructor approved, newest first, filtered by All / Open / Returned / Missing / Cancelled, with paging (FR-2.5)
+- [x] Decided: SignalR live updates (PRD 6.1). The app connects to `/hubs/live` while signed in and reloads Approvals, Alerts and My Loans when an event arrives, and everything after a reconnect. The PRD already says SignalR, so it needs no change.
+- [ ] ⚠️ My Loans still reloads every minute: the hub sends `asset.statusChanged` (In Transit → Verified in Room) to staff only. Ask the backend team to also send it to the approving instructor, then drop the poll.
 
 ## Phase 4 – Offline QR audit (Sprint 4: F7, US-13, US-14)
 
