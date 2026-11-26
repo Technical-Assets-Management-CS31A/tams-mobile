@@ -4,7 +4,9 @@ import '../../domain/entities/pending_approval.dart';
 /// `ApprovalEndpoints.Pending`):
 ///
 /// ```json
-/// {"frozen": false, "freezes": [...], "items": [{
+/// {"frozen": true, "freezes": [{"id", "reason": "OVERDUE", "frozenAt",
+///   "loanId", "loanNo", "assetCode", "assetName", "studentName"}],
+///  "items": [{
 ///   "sessionId": "...", "student": {"studentNo", "fullName", "sectionCode"},
 ///   "asset": {...}, "items": [{"assetCode", "name", "condition"}],
 ///   "photoUrl": "/api/approvals/{id}/photo",
@@ -26,9 +28,36 @@ PendingApprovals parsePendingApprovals(
   if (items is! List) {
     throw const FormatException('Pending approvals response has no "items".');
   }
+  final rawFreezes = body['freezes'];
+  final freezes = [
+    if (rawFreezes is List)
+      for (final f in rawFreezes)
+        if (f is Map && f['id'] is String) _freeze(f),
+  ];
   return PendingApprovals(
-    frozen: body['frozen'] == true,
+    frozen: body['frozen'] == true || freezes.isNotEmpty,
     items: [for (final i in items) _parseRequest(i, baseUrl)],
+    freezes: freezes,
+  );
+}
+
+/// A freeze with missing details still counts; the banner just says less.
+ApprovalFreeze _freeze(Map json) {
+  String? text(String key) {
+    final v = json[key];
+    return v is String && v.isNotEmpty ? v : null;
+  }
+
+  final at = text('frozenAt');
+  return ApprovalFreeze(
+    id: json['id'] as String,
+    reason: FreezeReason.parse(json['reason']),
+    frozenAt: at == null ? null : DateTime.tryParse(at)?.toLocal(),
+    loanId: text('loanId'),
+    loanNo: text('loanNo'),
+    assetCode: text('assetCode'),
+    assetName: text('assetName'),
+    studentName: text('studentName'),
   );
 }
 

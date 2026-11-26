@@ -104,6 +104,51 @@ void main() {
       expect(r.expiresAt.isUtc, isFalse, reason: 'shown in local time');
     });
 
+    test('reads each freeze with its loan, item and student (US-06)', () async {
+      http.body = {
+        'frozen': true,
+        'freezes': [
+          {
+            'id': 'f-1',
+            'reason': 'OVERDUE',
+            'frozenAt': '2026-11-18T03:00:00Z',
+            'loanId': 'loan-1',
+            'loanNo': 'L-2026-0001',
+            'assetCode': 'PRJ-0012',
+            'assetName': 'Epson Projector',
+            'studentName': 'Maria Santos',
+          },
+          // An event loan has no student; an unknown reason still freezes.
+          {'id': 'f-2', 'reason': 'SOMETHING_NEW', 'assetCode': 'CBL-0230'},
+          {'reason': 'MISSING'}, // no id: skipped
+        ],
+        'items': [],
+      };
+      final result = await repo.pending();
+
+      expect(result.frozen, isTrue);
+      expect(result.freezes.map((f) => f.id), ['f-1', 'f-2']);
+      final f = result.freezes.first;
+      expect(f.reason, FreezeReason.overdue);
+      expect(f.frozenAt!.toUtc(), DateTime.utc(2026, 11, 18, 3));
+      expect(f.loanId, 'loan-1');
+      expect(f.item, 'Epson Projector (PRJ-0012)');
+      expect(f.studentName, 'Maria Santos');
+      expect(result.freezes.last.reason, FreezeReason.other);
+      expect(result.freezes.last.item, 'CBL-0230');
+      expect(result.freezes.last.studentName, isNull);
+    });
+
+    test('freezes alone mean frozen, whatever the flag says', () async {
+      http.body = {
+        'freezes': [
+          {'id': 'f-1', 'reason': 'MISSING'},
+        ],
+        'items': [],
+      };
+      expect((await repo.pending()).frozen, isTrue);
+    });
+
     test('frozen instructor', () async {
       http.body = {
         'frozen': true,
