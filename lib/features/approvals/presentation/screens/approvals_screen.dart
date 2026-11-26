@@ -13,6 +13,7 @@ import '../../domain/entities/pending_approval.dart';
 import '../controllers/approvals_controller.dart';
 import '../widgets/approval_card.dart';
 import '../widgets/approve_sheet.dart';
+import '../widgets/freeze_banner.dart';
 
 /// Pending Approvals (PRD 6.6): borrow requests addressed to me, each
 /// approved with a room and class length, or declined (FR-2.2, US-04).
@@ -131,7 +132,10 @@ class _ApprovalsScreenState extends ConsumerState<ApprovalsScreen> {
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(16),
       children: [
-        if (data.frozen) ...[const _FrozenBanner(), const SizedBox(height: 12)],
+        if (data.frozen) ...[
+          FreezeBanner(freezes: data.freezes, canStillDecline: true),
+          const SizedBox(height: 12),
+        ],
         for (final request in requests) ...[
           ApprovalCard(
             key: ValueKey(request.id),
@@ -270,30 +274,5 @@ class _Scrollable extends StatelessWidget {
     return refresh == null
         ? scrollable
         : RefreshIndicator(onRefresh: refresh, child: scrollable);
-  }
-}
-
-/// Shown while staff have frozen my approval rights (FR-2.3).
-class _FrozenBanner extends StatelessWidget {
-  const _FrozenBanner();
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = Theme.of(context).colorScheme;
-    return Card(
-      color: colors.errorContainer,
-      child: ListTile(
-        leading: Icon(Icons.lock_outline, color: colors.onErrorContainer),
-        title: Text(
-          'Approvals frozen',
-          style: TextStyle(color: colors.onErrorContainer),
-        ),
-        subtitle: Text(
-          'Staff must lift the freeze before you can approve. '
-          'You can still decline.',
-          style: TextStyle(color: colors.onErrorContainer),
-        ),
-      ),
-    );
   }
 }
