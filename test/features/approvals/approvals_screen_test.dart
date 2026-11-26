@@ -482,6 +482,55 @@ void main() {
     });
   });
 
+  testWidgets('frozen: the banner names each item and student (US-06)', (
+    tester,
+  ) async {
+    final repo = FakeApprovalsRepository()
+      ..result = const PendingApprovals(
+        items: [],
+        frozen: true,
+        freezes: [
+          ApprovalFreeze(
+            id: 'f2',
+            reason: FreezeReason.lateArrivalLimit,
+            assetName: 'HDMI Cable',
+            assetCode: 'CBL-0230',
+            studentName: 'Juan Cruz',
+          ),
+          ApprovalFreeze(
+            id: 'f1',
+            reason: FreezeReason.overdue,
+            assetName: 'Epson Projector',
+            assetCode: 'PRJ-0012',
+            studentName: 'Maria Santos',
+          ),
+        ],
+      );
+    await _pump(tester, repo: repo);
+
+    expect(
+      find.text(
+        '4th late arrival: HDMI Cable (CBL-0230), borrowed by Juan Cruz',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.text(
+        'Overdue: Epson Projector (PRJ-0012), borrowed by Maria Santos',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.text(
+        'Technical staff must lift the freeze before you can approve. '
+        'You can still decline.',
+      ),
+      findsOneWidget,
+    );
+    // Frozen with nothing pending: the banner, not the empty state.
+    expect(find.text('No pending approvals'), findsNothing);
+  });
+
   testWidgets('frozen: banner shows and Approve is disabled', (tester) async {
     final repo = FakeApprovalsRepository()
       ..result = PendingApprovals(frozen: true, items: [approval('a')]);

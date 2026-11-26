@@ -6,6 +6,7 @@ import 'package:tams_mobile/features/approvals/domain/repositories/approvals_rep
 import 'package:tams_mobile/features/approvals/presentation/controllers/approvals_controller.dart';
 import 'package:tams_mobile/core/utils/clock.dart';
 import 'package:tams_mobile/features/approvals/presentation/widgets/countdown.dart';
+import 'package:tams_mobile/features/approvals/presentation/widgets/freeze_banner.dart';
 import 'package:tams_mobile/features/approvals/presentation/widgets/student_avatar.dart';
 
 import '../../helpers/fake_approvals_repository.dart';
@@ -337,6 +338,56 @@ void main() {
         await controller().refresh();
         expect(await ids(), ['new']);
       });
+    });
+  });
+
+  group('freezes', () {
+    const freeze = ApprovalFreeze(
+      id: 'f',
+      reason: FreezeReason.missing,
+      assetName: 'Epson Projector',
+      assetCode: 'PRJ-0012',
+    );
+
+    test('survive list changes', () {
+      final list = PendingApprovals(
+        items: [approval('a'), approval('b')],
+        frozen: true,
+        freezes: const [freeze],
+      );
+      for (final changed in [
+        list.without('a'),
+        list.updating('b', (r) => r.expiredAt(DateTime.now())),
+        list.shifted(const Duration(seconds: 5)),
+        // A reload keeps the expired requests and has its own freezes.
+        const PendingApprovals(
+          items: [],
+          frozen: true,
+          freezes: [freeze],
+        ).keepingExpired(list, DateTime.now().add(const Duration(hours: 1))),
+      ]) {
+        expect(changed.freezes, isNotEmpty);
+      }
+      expect(list.without('a').frozen, isTrue);
+    });
+
+    test('banner line says what it can', () {
+      expect(freezeLine(freeze), 'Missing: Epson Projector (PRJ-0012)');
+      expect(
+        freezeLine(
+          const ApprovalFreeze(
+            id: 'f',
+            reason: FreezeReason.overdue,
+            loanNo: 'L-2026-0001',
+            studentName: 'Maria Santos',
+          ),
+        ),
+        'Overdue: L-2026-0001, borrowed by Maria Santos',
+      );
+      expect(
+        freezeLine(const ApprovalFreeze(id: 'f', reason: FreezeReason.other)),
+        'Frozen',
+      );
     });
   });
 }
