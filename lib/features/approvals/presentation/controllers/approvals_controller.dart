@@ -29,7 +29,7 @@ final approvalsRepositoryProvider = Provider<ApprovalsRepository>(
 /// Empty while signed out, so the next user never sees the previous one's
 /// requests or freeze banner. A Riverpod-paused copy (its screen on a
 /// hidden tab) only rebuilds when read, so the app also reads it at
-/// sign-out (see `App`).
+/// sign-out (see `App`), as it does My Loans.
 class ApprovalsController extends AsyncNotifier<PendingApprovals> {
   ApprovalsRepository get _repo => ref.read(approvalsRepositoryProvider);
 
