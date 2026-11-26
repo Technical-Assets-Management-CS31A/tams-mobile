@@ -374,10 +374,27 @@ void main() {
       expect(find.text('Maria Santos'), findsOneWidget);
     });
 
+    testWidgets('freezes and the alerts behind them reload Pending Approvals, '
+        'which has the banner', (tester) async {
+      final h = await _pump(tester);
+      var calls = h.approvals.pendingCalls;
+
+      for (final type in [
+        'instructor.frozen',
+        ' instructor.unfrozen ',
+        'loan.overdue',
+        'warning.issued',
+      ]) {
+        h.messaging.foreground.add(_push(type, title: null));
+        await tester.pumpAndSettle();
+        expect(h.approvals.pendingCalls, ++calls, reason: type);
+      }
+    });
+
     testWidgets('other pushes leave the list alone', (tester) async {
       final h = await _pump(tester);
 
-      h.messaging.foreground.add(_push('loan.overdue', title: null));
+      h.messaging.foreground.add(_push('loan.created', title: null));
       await tester.pumpAndSettle();
 
       expect(h.approvals.pendingCalls, 1);
