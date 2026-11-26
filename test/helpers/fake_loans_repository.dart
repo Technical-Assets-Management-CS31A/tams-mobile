@@ -20,6 +20,9 @@ class FakeLoansRepository implements LoansRepository {
   int? historyTotal;
   final historyCalls = <(LoanHistoryFilter, int)>[];
 
+  /// Awaited before each Loan History page is answered, to hold one open.
+  Future<void> Function(LoanHistoryFilter filter, int page)? beforeHistory;
+
   @override
   Future<LoansPage> myOpenLoans() async {
     listCalls++;
@@ -33,6 +36,7 @@ class FakeLoansRepository implements LoansRepository {
     int page = 1,
   }) async {
     historyCalls.add((filter, page));
+    await beforeHistory?.call(filter, page);
     if (error case final e?) throw e;
     final matching = [
       for (final l in history ?? loans)

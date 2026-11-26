@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -226,6 +228,85 @@ void main() {
         (LoanHistoryFilter.all, 2),
       ]);
       expect(find.text('Item 4'), findsOneWidget);
+    });
+    testWidgets("a filter change mid-page still loads the new filter's pages", (
+      tester,
+    ) async {
+      final held = Completer<void>();
+      final repo = fiveLoans()
+        ..beforeHistory = (filter, page) async {
+          if (filter == LoanHistoryFilter.all && page == 2) await held.future;
+        };
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            loansRepositoryProvider.overrideWithValue(repo),
+            clockProvider.overrideWithValue(() => now),
+            authTokenProvider.overrideWith(SignedInToken.new),
+          ],
+          child: const MaterialApp(home: LoanHistoryScreen()),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pump(const Duration(milliseconds: 100));
+      // All's page 2 is under way and stays open.
+      expect(repo.historyCalls.last, (LoanHistoryFilter.all, 2));
+
+      await tester.tap(find.byKey(const ValueKey('history-filter-returned')));
+      for (var i = 0; i < 5; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+
+      expect(repo.historyCalls, contains((LoanHistoryFilter.returned, 2)));
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+
+      // All's late page is dropped, not added to Returned's list.
+      held.complete();
+      await tester.pumpAndSettle();
+      await scrollToEnd(tester);
+      expect(find.text('Item 4'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+    });
+
+    testWidgets('a failed page offers a retry instead of spinning', (
+      tester,
+    ) async {
+      var offline = true;
+      final repo = fiveLoans()
+        ..beforeHistory = (filter, page) async {
+          if (page == 2 && offline) throw const Failure('Offline.');
+        };
+      await pump(tester, repo);
+
+      final retry = find.byKey(const ValueKey('history-load-more-retry'));
+      expect(retry, findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      // Nothing retries on its own while the row shows.
+      expect(repo.historyCalls, [
+        (LoanHistoryFilter.all, 1),
+        (LoanHistoryFilter.all, 2),
+      ]);
+
+      offline = false;
+      await tester.tap(retry);
+      await tester.pumpAndSettle();
+      expect(retry, findsNothing);
+      expect(find.byType(CircularProgressIndicator), findsNothing);
+      expect(repo.historyCalls.last, (LoanHistoryFilter.all, 2));
+      expect(repo.historyCalls, hasLength(3));
+    });
+
+    testWidgets('a retry that fails again stays on the error', (tester) async {
+      await pump(
+        tester,
+        FakeLoansRepository()..error = const Failure('Offline.'),
+      );
+
+      await tester.tap(find.text('Try again'));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text("Couldn't load your loan history"), findsOneWidget);
     });
 
     testWidgets('an error offers a retry', (tester) async {
