@@ -328,4 +328,57 @@ void main() {
       expect(find.text('Due in 1 h 00 min'), findsOneWidget);
     });
   });
+
+  group('a new session', () {
+    late FakeLoansRepository repo;
+    late ProviderContainer container;
+    TokenNotifier token() => container.read(authTokenProvider.notifier);
+    Future<List<String>> ids() async => [
+      for (final l in (await container.read(myLoansProvider.future)).items)
+        l.id,
+    ];
+
+    setUp(() {
+      repo = FakeLoansRepository([
+        openLoan('mine', dueAt: DateTime(2026, 11, 18, 12)),
+      ]);
+      container = ProviderContainer(
+        overrides: [
+          loansRepositoryProvider.overrideWithValue(repo),
+          authTokenProvider.overrideWith(SignedInToken.new),
+        ],
+      );
+      addTearDown(container.dispose);
+    });
+
+    test('signing out empties the list at once', () async {
+      container.listen(myLoansProvider, (_, _) {});
+      expect(await ids(), ['mine']);
+      token().clear();
+      final shown = container.read(myLoansProvider);
+      expect(shown.value!.items, isEmpty);
+      expect(shown.isLoading, isFalse);
+    });
+
+    test('paused on a hidden tab, with the sign-out read', () async {
+      final screen = container.listen(myLoansProvider, (_, _) {});
+      expect(await ids(), ['mine']);
+      screen.close();
+      repo.loans = [openLoan('theirs', dueAt: DateTime(2026, 11, 18, 12))];
+      token().clear();
+      // What App does at sign-out.
+      container.read(myLoansProvider);
+      token().set('someone-else');
+      expect(container.read(myLoansProvider).value!.items, isEmpty);
+      expect(await ids(), ['theirs']);
+    });
+
+    test('a renewed token does not reload', () async {
+      container.listen(myLoansProvider, (_, _) {});
+      expect(await ids(), ['mine']);
+      token().set('renewed-token');
+      await ids();
+      expect(repo.listCalls, 1);
+    });
+  });
 }

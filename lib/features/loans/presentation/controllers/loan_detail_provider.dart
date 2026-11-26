@@ -18,10 +18,15 @@ final loanDetailProvider = FutureProvider.autoDispose
     );
 
 /// My Loans (FR-2.5): the open loans I approved, soonest due first.
-/// Invalidate it to reload; the list stays on screen meanwhile. Rebuilt on
-/// sign-in and sign-out, so one user never sees another's loans.
-final myLoansProvider = FutureProvider<LoansPage>((ref) async {
+/// Invalidate it to reload; the list stays on screen meanwhile. Empty while
+/// signed out, so one user never sees another's loans; a Riverpod-paused
+/// copy (My Loans on a hidden tab) is read at sign-out for that (see `App`).
+final myLoansProvider = FutureProvider<LoansPage>((ref) {
   final repo = ref.watch(loansRepositoryProvider);
-  if (ref.watch(authTokenProvider) == null) return LoansPage.empty;
+  // Signed in or not, not the token itself: a renewed token mustn't
+  // reload. Not async, so a sign-out empties the list at once.
+  if (!ref.watch(authTokenProvider.select((t) => t != null))) {
+    return LoansPage.empty;
+  }
   return repo.myOpenLoans();
 });
