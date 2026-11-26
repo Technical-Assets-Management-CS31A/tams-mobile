@@ -8,6 +8,8 @@ import '../../../../core/errors/failures.dart';
 import '../../../../core/utils/clock.dart';
 import '../../../../core/widgets/empty_state.dart';
 import '../../../../routing/locations.dart';
+import '../../../approvals/presentation/controllers/approvals_controller.dart';
+import '../../../approvals/presentation/widgets/freeze_banner.dart';
 import '../../domain/entities/loan_detail.dart';
 import '../controllers/loan_detail_provider.dart';
 import '../widgets/loan_card.dart';
@@ -15,8 +17,8 @@ import '../widgets/loan_card.dart';
 /// My Loans (PRD 6.6, FR-2.5): the open loans I approved, each with its
 /// live status (At Counter, In Transit, Verified in Room, Overdue) and a
 /// countdown to when it is due back, grace included. Overdue and other
-/// urgent loans come first, then the soonest due. History lists every loan
-/// I approved, past ones included.
+/// urgent loans come first, then the soonest due. The freeze banner shows
+/// here too while my approvals are frozen, and History lists past loans.
 class MyLoansScreen extends ConsumerStatefulWidget {
   const MyLoansScreen({super.key});
 
@@ -60,27 +62,44 @@ class _MyLoansScreenState extends ConsumerState<MyLoansScreen> {
     }
   }
 
-  Future<void> _reload() => ref.refresh(myLoansProvider.future);
+  /// Reloads the loans, and the freezes for the banner.
+  Future<void> _reload() async {
+    await Future.wait([
+      ref.refresh(myLoansProvider.future),
+      ref.read(approvalsControllerProvider.notifier).refresh(),
+    ]);
+  }
 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(myLoansProvider);
     final now = ref.watch(clockProvider)();
     _tick(state.value?.items.isNotEmpty ?? false);
+    // The freezes come with Pending Approvals (`GET /approvals/pending`).
+    final approvals = ref.watch(approvalsControllerProvider).value;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-          child: Align(
-            alignment: Alignment.centerRight,
-            child: TextButton.icon(
-              key: const Key('loan-history'),
-              onPressed: () => context.push(loanHistoryLocation),
-              icon: const Icon(Icons.history),
-              label: const Text('History'),
-            ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (approvals != null && approvals.frozen) ...[
+                const SizedBox(height: 8),
+                FreezeBanner(freezes: approvals.freezes),
+              ],
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  key: const Key('loan-history'),
+                  onPressed: () => context.push(loanHistoryLocation),
+                  icon: const Icon(Icons.history),
+                  label: const Text('History'),
+                ),
+              ),
+            ],
           ),
         ),
         Expanded(child: _body(state, now)),

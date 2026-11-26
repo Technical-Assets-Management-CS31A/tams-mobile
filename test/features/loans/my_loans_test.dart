@@ -5,6 +5,8 @@ import 'package:tams_mobile/core/errors/failures.dart';
 import 'package:tams_mobile/core/network/token_provider.dart';
 import 'package:tams_mobile/core/utils/clock.dart';
 import 'package:tams_mobile/core/utils/time_format.dart';
+import 'package:tams_mobile/features/approvals/domain/entities/pending_approval.dart';
+import 'package:tams_mobile/features/approvals/presentation/controllers/approvals_controller.dart';
 import 'package:tams_mobile/features/loans/data/models/loan_detail_model.dart';
 import 'package:tams_mobile/features/loans/data/repositories/loans_repository_impl.dart';
 import 'package:tams_mobile/features/loans/domain/entities/loan_detail.dart';
@@ -12,6 +14,7 @@ import 'package:tams_mobile/features/loans/presentation/controllers/loan_detail_
 import 'package:tams_mobile/features/loans/presentation/screens/my_loans_screen.dart';
 
 import '../../helpers/fake_alerts_repository.dart' show SignedInToken;
+import '../../helpers/fake_approvals_repository.dart';
 import '../../helpers/fake_http_adapter.dart';
 import '../../helpers/fake_loans_repository.dart';
 
@@ -169,12 +172,16 @@ void main() {
 
     Future<FakeLoansRepository> pump(
       WidgetTester tester,
-      FakeLoansRepository repo,
-    ) async {
+      FakeLoansRepository repo, {
+      FakeApprovalsRepository? approvals,
+    }) async {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
             loansRepositoryProvider.overrideWithValue(repo),
+            approvalsRepositoryProvider.overrideWithValue(
+              approvals ?? FakeApprovalsRepository(),
+            ),
             clockProvider.overrideWithValue(() => now),
             authTokenProvider.overrideWith(SignedInToken.new),
           ],
@@ -262,6 +269,42 @@ void main() {
       await tester.pump(MyLoansScreen.pollEvery);
       await tester.pump();
       expect(repo.listCalls, 2);
+    });
+
+    testWidgets('frozen: the banner names the item and student (US-06)', (
+      tester,
+    ) async {
+      final approvals = FakeApprovalsRepository()
+        ..result = const PendingApprovals(
+          items: [],
+          frozen: true,
+          freezes: [
+            ApprovalFreeze(
+              id: 'f1',
+              reason: FreezeReason.overdue,
+              assetName: 'Epson Projector',
+              assetCode: 'PRJ-0012',
+              studentName: 'Maria Santos',
+            ),
+          ],
+        );
+      await pump(tester, FakeLoansRepository(), approvals: approvals);
+
+      expect(find.text('Approvals frozen'), findsOneWidget);
+      expect(
+        find.text(
+          'Overdue: Epson Projector (PRJ-0012), borrowed by Maria Santos',
+        ),
+        findsOneWidget,
+      );
+      // Declining is only offered on Pending Approvals.
+      expect(find.textContaining('You can still decline'), findsNothing);
+    });
+
+    testWidgets('no banner while not frozen', (tester) async {
+      await pump(tester, FakeLoansRepository());
+      expect(find.text('Approvals frozen'), findsNothing);
+      expect(find.text('History'), findsOneWidget);
     });
 
     testWidgets('empty state', (tester) async {
